@@ -247,7 +247,8 @@ class Scheduler:
             message = f"Time: {self.current_time}, Compute Node terminates UPF {upf.upf_id}"
             self._log(message)
 
-        self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}")
+        self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
+                  f"Total UPFs deployed: {self.next_upf_id}.")
 
 
 if __name__ == "__main__":

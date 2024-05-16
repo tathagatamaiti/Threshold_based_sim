@@ -148,6 +148,10 @@ class Scheduler:
             else:
                 message = f"Time: {self.current_time}, Cannot scale out due to maximum UPF instances reached"
                 self._log(message)
+                message = (f"Time: {self.current_time}, Cannot assign PDU session to UPF because of resource "
+                           f"constraints, terminating PDU session")
+                self._log(message)
+                self.terminate_pdu_session(session)
 
         if available_upf:
             if len(available_upf.sessions) >= self.max_sessions_per_upf - self.scale_out_threshold:

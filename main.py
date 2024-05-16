@@ -177,10 +177,10 @@ class Scheduler:
         :param session: Session to be terminated.
         """
         upf = next((upf for upf in self.upfs if session in upf.sessions), None)
-        message = f"Time: {self.current_time}, PDU Session {session.session_id} terminated on UPF {upf.upf_id}"
-        self._log(message)
         if upf:
             upf.remove_session(session)
+            message = f"Time: {self.current_time}, PDU Session {session.session_id} terminated on UPF {upf.upf_id}"
+            self._log(message)
             if self.num_upf_instances > self.min_upf_instances and len(
                     upf.sessions) == self.max_sessions_per_upf - self.scale_in_threshold:
                 self.scale_in(upf)

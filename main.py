@@ -2,6 +2,7 @@ import heapq
 import random
 import argparse
 import math
+import matplotlib.pyplot as plt
 
 # Event types
 EVENT_GENERATE_PDU_SESSION = 1
@@ -213,7 +214,15 @@ class Scheduler:
     def run(self):
         """
         Run the simulation.
+
+        This method executes the simulation and generates plots for PDU count against simulation time
+        and UPF count against simulation time.
         """
+
+        pdu_counts = []  # List to store PDU counts
+        upf_counts = []  # List to store UPF counts
+        time_points = []  # List to store time points
+
         # Schedule the initial PDU session generation
         generation_event = Event(EVENT_GENERATE_PDU_SESSION, 0)
         heapq.heappush(self.event_queue, generation_event)
@@ -224,6 +233,10 @@ class Scheduler:
 
             event = heapq.heappop(self.event_queue)
             self.current_time = event.time
+
+            pdu_counts.append(self.session_counter)  # Record PDU count
+            upf_counts.append(self.next_upf_id)  # Record UPF count
+            time_points.append(self.current_time)  # Record time
 
             if event.event_type == EVENT_GENERATE_PDU_SESSION:
                 self.generate_pdu_session()
@@ -249,6 +262,28 @@ class Scheduler:
 
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
                   f"Total UPFs deployed: {self.next_upf_id}.")
+
+        # Plot PDU against simulation time
+        plt.figure(figsize=(10, 6))
+        plt.plot(time_points, pdu_counts, label='PDU Count', color='blue')
+        plt.xlabel('Simulation Time')
+        plt.ylabel('PDU Count')
+        plt.title('PDU vs Simulation Time')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig('pdu_vs_simulation_time.png')
+        plt.show()
+
+        # Plot UPF against simulation time
+        plt.figure(figsize=(10, 6))
+        plt.plot(time_points, upf_counts, label='UPF Count', color='red')
+        plt.xlabel('Simulation Time')
+        plt.ylabel('UPF Count')
+        plt.title('UPF vs Simulation Time')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig('upf_vs_simulation_time.png')
+        plt.show()
 
 
 if __name__ == "__main__":

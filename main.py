@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 # Event types
 EVENT_GENERATE_PDU_SESSION = 1
 EVENT_TERMINATE_PDU_SESSION = 2
-EVENT_SCALE_OUT = 3
-EVENT_SCALE_IN = 4
 
 
 class Event:
@@ -116,6 +114,8 @@ class Scheduler:
         self.session_counter = 0
         self.current_time = 0
         self.simulation_time = simulation_time
+        self.active_sessions = 0  # I: number of sessions being served
+        self.free_slots = 0  # U: number of free slots in the system
         self.output_file = output_file
 
     def _log(self, message):
@@ -126,6 +126,12 @@ class Scheduler:
         """
         with open(self.output_file, 'a') as f:
             f.write(message + '\n')
+
+    def update_free_slots(self):
+        """
+        Update the number of free slots in the system.
+        """
+        self.free_slots = sum(self.max_sessions_per_upf - len(upf.sessions) for upf in self.upfs)
 
     def generate_pdu_session(self):
         """
@@ -155,13 +161,16 @@ class Scheduler:
                 self.terminate_pdu_session(session)
 
         if available_upf:
-            if len(available_upf.sessions) >= self.max_sessions_per_upf - self.scale_out_threshold:
+            if (self.active_sessions == (self.num_upf_instances * self.max_sessions_per_upf) -
+                    self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
                 self.scale_out()
                 available_upf = self.upfs[-1]
 
             message = f"Time: {self.current_time}, UE sends PDU session {session_id} request to Compute Node"
             self._log(message)
             available_upf.add_session(session)
+            self.active_sessions += 1
+            self.update_free_slots()
             end_event = Event(EVENT_TERMINATE_PDU_SESSION, self.current_time + duration)
             heapq.heappush(self.event_queue, end_event)
 
@@ -180,10 +189,11 @@ class Scheduler:
         upf = next((upf for upf in self.upfs if session in upf.sessions), None)
         if upf:
             upf.remove_session(session)
+            self.active_sessions -= 1
+            self.update_free_slots()
             message = f"Time: {self.current_time}, PDU Session {session.session_id} terminated on UPF {upf.upf_id}"
             self._log(message)
-            if self.num_upf_instances > self.min_upf_instances and len(
-                    upf.sessions) == self.max_sessions_per_upf - self.scale_in_threshold:
+            if self.free_slots == self.scale_in_threshold and self.num_upf_instances >= self.min_upf_instances + 1:
                 self.scale_in(upf)
 
     def scale_out(self):
@@ -196,6 +206,7 @@ class Scheduler:
             new_upf = UPF(new_upf_id)
             self.upfs.append(new_upf)
             self.num_upf_instances += 1
+            self.update_free_slots()
             message = f"Time: {self.current_time}, Compute Node launches UPF {new_upf_id}"
             self._log(message)
 
@@ -208,6 +219,7 @@ class Scheduler:
         if upf.upf_id >= self.min_upf_instances:
             self.upfs.remove(upf)
             self.num_upf_instances -= 1
+            self.update_free_slots()
             message = f"Time: {self.current_time}, Compute Node terminates UPF {upf.upf_id}"
             self._log(message)
 
@@ -288,11 +300,11 @@ class Scheduler:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Event-based scheduler simulation")
-    parser.add_argument("--max-upf-instances", type=int, default=4, help="Maximum number of UPF instances (L)")
+    parser.add_argument("--max-upf-instances", type=int, default=110, help="Maximum number of UPF instances (L)")
     parser.add_argument("--min-upf-instances", type=int, default=1, help="Minimum number of UPF instances (M)")
-    parser.add_argument("--max-sessions-per-upf", type=int, default=3, help="Maximum number of sessions per UPF (C)")
-    parser.add_argument("--scale-out-threshold", type=int, default=2, help="Scale-out threshold (T1)")
-    parser.add_argument("--scale-in-threshold", type=int, default=3, help="Scale-in threshold (T2)")
+    parser.add_argument("--max-sessions-per-upf", type=int, default=8, help="Maximum number of sessions per UPF (C)")
+    parser.add_argument("--scale-out-threshold", type=int, default=3, help="Scale-out threshold (T1)")
+    parser.add_argument("--scale-in-threshold", type=int, default=13, help="Scale-in threshold (T2)")
     parser.add_argument("--simulation-time", type=int, default=10000, help="Simulation time")
     parser.add_argument("--output-file", type=str, default="simulation.log", help="File to write simulation outputs")
 

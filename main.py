@@ -133,9 +133,19 @@ class Scheduler:
         """
         self.free_slots = sum(self.max_sessions_per_upf - len(upf.sessions) for upf in self.upfs)
 
-    def generate_pdu_session(self):
+    def get_upf_with_lowest_sessions(self):
+        """
+        Get the UPF with the lowest number of sessions.
+        If multiple UPFs have the same lowest number of sessions, randomly select one.
+        """
+        upfs_sorted = sorted(self.upfs, key=lambda upf: len(upf.sessions))
+        lowest_sessions_upfs = [upf for upf in upfs_sorted if len(upf.sessions) == len(upfs_sorted[0].sessions)]
+        return random.choice(lowest_sessions_upfs)
+
+    def generate_pdu_session(self, case):
         """
         Generate a new PDU session event.
+        :param case: Case 1 (default) or Case 2 (select UPF with the lowest sessions).
         """
         message = f"Time: {self.current_time}, UE generates PDU session"
         self._log(message)
@@ -145,7 +155,13 @@ class Scheduler:
         session = PDUSession(session_id, self.current_time, duration)
 
         # Find an available UPF
-        available_upf = next((upf for upf in self.upfs if len(upf.sessions) < self.max_sessions_per_upf), None)
+        if case == 1:
+            available_upf = next((upf for upf in self.upfs if len(upf.sessions) < self.max_sessions_per_upf), None)
+        elif case == 2:
+            available_upf = self.get_upf_with_lowest_sessions() if self.upfs else None
+        else:
+            message = f"Time: {self.current_time}, No UPF available"
+            self._log(message)
 
         # If no available UPF, scale out if possible
         if not available_upf:
@@ -232,7 +248,8 @@ class Scheduler:
         """
 
         pdu_counts = []  # List to store PDU counts
-        upf_counts = []  # List to store UPF counts
+        upf_counts_case1 = []  # List to store UPF counts for Case 1
+        upf_counts_case2 = []  # List to store UPF counts for Case 2
         time_points = []  # List to store time points
 
         # Schedule the initial PDU session generation
@@ -247,11 +264,13 @@ class Scheduler:
             self.current_time = event.time
 
             pdu_counts.append(self.session_counter)  # Record PDU count
-            upf_counts.append(self.next_upf_id)  # Record UPF count
+            upf_counts_case1.append(self.next_upf_id)  # Record UPF count for Case 1
+            upf_counts_case2.append(self.next_upf_id)  # Record UPF count for Case 2
             time_points.append(self.current_time)  # Record time
 
             if event.event_type == EVENT_GENERATE_PDU_SESSION:
-                self.generate_pdu_session()
+                self.generate_pdu_session(case=1)  # Run Case 1
+                self.generate_pdu_session(case=2)  # Run Case 2
 
                 # Schedule the next PDU session generation
                 next_generation_time = self.current_time + random.randint(1, 10)  # Random interval between 1 and 10
@@ -288,7 +307,8 @@ class Scheduler:
 
         # Plot UPF against simulation time
         plt.figure(figsize=(10, 6))
-        plt.plot(time_points, upf_counts, label='UPF Count', color='red')
+        plt.plot(time_points, upf_counts_case1, label='UPF Count', color='green')
+        plt.plot(time_points, upf_counts_case2, label='UPF Count', color='red')
         plt.xlabel('Simulation Time')
         plt.ylabel('UPF Count')
         plt.title('UPF vs Simulation Time')

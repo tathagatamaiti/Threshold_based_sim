@@ -2,7 +2,7 @@ import heapq
 import random
 import argparse
 import numpy as np
-from post_processing import generate_plots
+import post_processing
 
 # Event types
 EVENT_GENERATE_PDU_SESSION = 1
@@ -300,7 +300,15 @@ class Scheduler:
                   f"Total UPFs deployed: {self.next_upf_id}.")
 
         # Generate plots
-        generate_plots(time_points, pdu_counts, upf_counts, active_pdu_counts, active_upf_counts)
+        if self.upf_case == 0:
+            post_processing.generate_plots_case0(time_points, pdu_counts, upf_counts, active_pdu_counts,
+                                                 active_upf_counts)
+        elif self.upf_case == 1:
+            post_processing.generate_plots_case1(time_points, pdu_counts, upf_counts, active_pdu_counts,
+                                                 active_upf_counts)
+        else:
+            message = f"No plots to show, invalid sorting case"
+            self._log(message)
 
 
 if __name__ == "__main__":

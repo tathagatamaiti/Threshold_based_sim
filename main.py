@@ -1,8 +1,9 @@
 import heapq
 import random
 import argparse
-import math
 import matplotlib.pyplot as plt
+import numpy as np
+from post_processing import generate_plots
 
 # Event types
 EVENT_GENERATE_PDU_SESSION = 1
@@ -89,26 +90,32 @@ class Scheduler:
     Implements the event-based scheduler simulation.
     """
 
-    def __init__(self, max_upf_instances, min_upf_instances, max_sessions_per_upf, scale_out_threshold,
-                 scale_in_threshold, simulation_time, output_file):
+    def __init__(self, upf_case, max_upf_instances, min_upf_instances, max_sessions_per_upf, scale_out_threshold,
+                 scale_in_threshold, simulation_time, arrival_rate, mu, output_file):
         """
         Initialize the scheduler with simulation parameters.
 
+        :param upf_case: Case for UPF sorting.
         :param max_upf_instances: Maximum number of UPF instances (L).
         :param min_upf_instances: Minimum number of UPF instances (M).
         :param max_sessions_per_upf: Maximum number of sessions per UPF (C).
         :param scale_out_threshold: Scale-out threshold (T1).
         :param scale_in_threshold: Scale-in threshold (T2).
         :param simulation_time: Total simulation time.
+        :param arrival_rate: Rate of session arrival (λ).
+        :param mu: Session duration parameter (µ).
         :param output_file: File to write simulation outputs.
         """
         self.event_queue = []
         self.upfs = []
+        self.upf_case = upf_case
         self.max_upf_instances = max_upf_instances
         self.min_upf_instances = min_upf_instances
         self.max_sessions_per_upf = max_sessions_per_upf
         self.scale_out_threshold = scale_out_threshold
         self.scale_in_threshold = scale_in_threshold
+        self.arrival_rate = arrival_rate
+        self.mu = mu
         self.num_upf_instances = 0
         self.next_upf_id = 0
         self.session_counter = 0
@@ -142,22 +149,21 @@ class Scheduler:
         lowest_sessions_upfs = [upf for upf in upfs_sorted if len(upf.sessions) == len(upfs_sorted[0].sessions)]
         return random.choice(lowest_sessions_upfs)
 
-    def generate_pdu_session(self, case):
+    def generate_pdu_session(self):
         """
         Generate a new PDU session event.
-        :param case: Case 1 (default) or Case 2 (select UPF with the lowest sessions).
         """
         message = f"Time: {self.current_time}, UE generates PDU session"
         self._log(message)
         session_id = self.session_counter
         self.session_counter += 1
-        duration = math.ceil(-math.log(random.uniform(0, 1)) * 5)  # Exponential distribution between 1 and 5
+        duration = np.random.exponential(1/self.mu)
         session = PDUSession(session_id, self.current_time, duration)
 
         # Find an available UPF
-        if case == 1:
+        if self.upf_case == 0:
             available_upf = next((upf for upf in self.upfs if len(upf.sessions) < self.max_sessions_per_upf), None)
-        elif case == 2:
+        elif self.upf_case == 1:
             available_upf = self.get_upf_with_lowest_sessions() if self.upfs else None
         else:
             message = f"Time: {self.current_time}, No UPF available"
@@ -248,8 +254,9 @@ class Scheduler:
         """
 
         pdu_counts = []  # List to store PDU counts
-        upf_counts_case1 = []  # List to store UPF counts for Case 1
-        upf_counts_case2 = []  # List to store UPF counts for Case 2
+        upf_counts = []  # List to store UPF counts
+        active_pdu_counts = []  # List to store active PDU counts
+        active_upf_counts = []  # List to store active UPF counts
         time_points = []  # List to store time points
 
         # Schedule the initial PDU session generation
@@ -264,17 +271,16 @@ class Scheduler:
             self.current_time = event.time
 
             pdu_counts.append(self.session_counter)  # Record PDU count
-            upf_counts_case1.append(self.next_upf_id)  # Record UPF count for Case 1
-            upf_counts_case2.append(self.next_upf_id)  # Record UPF count for Case 2
+            upf_counts.append(self.next_upf_id)  # Record UPF count
+            active_pdu_counts.append(self.active_sessions)  # Record active PDU count
+            active_upf_counts.append(self.num_upf_instances)  # Record active UPF count
             time_points.append(self.current_time)  # Record time
 
             if event.event_type == EVENT_GENERATE_PDU_SESSION:
-                self.generate_pdu_session(case=1)  # Run Case 1
-                self.generate_pdu_session(case=2)  # Run Case 2
+                self.generate_pdu_session()
 
                 # Schedule the next PDU session generation
-                next_generation_time = self.current_time + random.randint(1, 10)  # Random interval between 1 and 10
-                # time units
+                next_generation_time = self.current_time + np.random.exponential(1 / self.arrival_rate)
                 if next_generation_time <= self.simulation_time:
                     generation_event = Event(EVENT_GENERATE_PDU_SESSION, next_generation_time)
                     heapq.heappush(self.event_queue, generation_event)
@@ -294,42 +300,26 @@ class Scheduler:
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
                   f"Total UPFs deployed: {self.next_upf_id}.")
 
-        # Plot PDU against simulation time
-        plt.figure(figsize=(10, 6))
-        plt.plot(time_points, pdu_counts, label='PDU Count', color='blue')
-        plt.xlabel('Simulation Time')
-        plt.ylabel('PDU Count')
-        plt.title('PDU vs Simulation Time')
-        plt.grid(True)
-        plt.legend()
-        plt.savefig('pdu_vs_simulation_time.png')
-        plt.show()
-
-        # Plot UPF against simulation time
-        plt.figure(figsize=(10, 6))
-        plt.plot(time_points, upf_counts_case1, label='UPF Count', color='green')
-        plt.plot(time_points, upf_counts_case2, label='UPF Count', color='red')
-        plt.xlabel('Simulation Time')
-        plt.ylabel('UPF Count')
-        plt.title('UPF vs Simulation Time')
-        plt.grid(True)
-        plt.legend()
-        plt.savefig('upf_vs_simulation_time.png')
-        plt.show()
+        # Generate plots
+        generate_plots(time_points, pdu_counts, upf_counts, active_pdu_counts, active_upf_counts)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Event-based scheduler simulation")
+    parser.add_argument("--upf_case", type=int, default=1, help="Case for UPF sorting")
     parser.add_argument("--max-upf-instances", type=int, default=110, help="Maximum number of UPF instances (L)")
     parser.add_argument("--min-upf-instances", type=int, default=1, help="Minimum number of UPF instances (M)")
     parser.add_argument("--max-sessions-per-upf", type=int, default=8, help="Maximum number of sessions per UPF (C)")
     parser.add_argument("--scale-out-threshold", type=int, default=3, help="Scale-out threshold (T1)")
     parser.add_argument("--scale-in-threshold", type=int, default=13, help="Scale-in threshold (T2)")
-    parser.add_argument("--simulation-time", type=int, default=10000, help="Simulation time")
+    parser.add_argument("--simulation-time", type=int, default=1000, help="Simulation time")
+    parser.add_argument("--arrival_rate", type=int, default=500, help="Inter-arrival rate")
+    parser.add_argument("--mu", type=int, default=1, help="µ parameter for session duration")
     parser.add_argument("--output-file", type=str, default="simulation.log", help="File to write simulation outputs")
 
     args = parser.parse_args()
 
-    scheduler = Scheduler(args.max_upf_instances, args.min_upf_instances, args.max_sessions_per_upf,
-                          args.scale_out_threshold, args.scale_in_threshold, args.simulation_time, args.output_file)
+    scheduler = Scheduler(args.upf_case, args.max_upf_instances, args.min_upf_instances, args.max_sessions_per_upf,
+                          args.scale_out_threshold, args.scale_in_threshold, args.simulation_time, args.arrival_rate,
+                          args.mu, args.output_file)
     scheduler.run()

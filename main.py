@@ -1,7 +1,6 @@
 import heapq
 import random
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
 from post_processing import generate_plots
 
@@ -312,9 +311,9 @@ if __name__ == "__main__":
     parser.add_argument("--max-sessions-per-upf", type=int, default=8, help="Maximum number of sessions per UPF (C)")
     parser.add_argument("--scale-out-threshold", type=int, default=3, help="Scale-out threshold (T1)")
     parser.add_argument("--scale-in-threshold", type=int, default=13, help="Scale-in threshold (T2)")
-    parser.add_argument("--simulation-time", type=int, default=1000, help="Simulation time")
-    parser.add_argument("--arrival_rate", type=int, default=500, help="Inter-arrival rate")
-    parser.add_argument("--mu", type=int, default=1, help="µ parameter for session duration")
+    parser.add_argument("--simulation-time", type=int, default=100, help="Simulation time")
+    parser.add_argument("--arrival_rate", type=int, default=500, help="Inter-arrival rate (λ)")
+    parser.add_argument("--mu", type=int, default=1, help="parameter for session duration (µ)")
     parser.add_argument("--output-file", type=str, default="simulation.log", help="File to write simulation outputs")
 
     args = parser.parse_args()

@@ -25,7 +25,7 @@ def generate_plots_case0(time_points, pdu_counts, upf_counts, active_pdu_counts,
     # Plot PDU against simulation time
     plt.figure(figsize=(10, 6))
     plt.plot(time_points, pdu_counts, label='PDU Count', color='blue')
-    plt.xlabel('Simulation Time')
+    plt.xlabel('Simulation Time in ms')
     plt.ylabel('PDUs')
     plt.title('PDU for case 0 vs Simulation Time')
     plt.grid(True)
@@ -36,7 +36,7 @@ def generate_plots_case0(time_points, pdu_counts, upf_counts, active_pdu_counts,
     # Plot UPF against simulation time
     plt.figure(figsize=(10, 6))
     plt.plot(time_points, upf_counts, label='UPF Count', color='green')
-    plt.xlabel('Simulation Time')
+    plt.xlabel('Simulation Time in ms')
     plt.ylabel('UPFs')
     plt.title('UPF for case 0 vs Simulation Time')
     plt.grid(True)
@@ -46,7 +46,7 @@ def generate_plots_case0(time_points, pdu_counts, upf_counts, active_pdu_counts,
 
     plt.figure(figsize=(10, 6))
     plt.plot(time_points, active_pdu_counts, label='Active PDUs', color='red')
-    plt.xlabel('Simulation Time')
+    plt.xlabel('Simulation Time in ms')
     plt.ylabel('Active PDUs')
     plt.title('Active PDUs for case 0 vs Simulation Time')
     plt.grid(True)
@@ -57,7 +57,7 @@ def generate_plots_case0(time_points, pdu_counts, upf_counts, active_pdu_counts,
     # Plot active UPFs against simulation time
     plt.figure(figsize=(10, 6))
     plt.plot(time_points, active_upf_counts, label='Active UPFs', color='orange')
-    plt.xlabel('Simulation Time')
+    plt.xlabel('Simulation Time in ms')
     plt.ylabel('Active UPFs')
     plt.title('Active UPFs for case 0 vs Simulation Time')
     plt.grid(True)
@@ -108,7 +108,7 @@ def generate_plots_case1(time_points, pdu_counts, upf_counts, active_pdu_counts,
     # Plot PDU against simulation time
     plt.figure(figsize=(10, 6))
     plt.plot(time_points, pdu_counts, label='PDU Count', color='blue')
-    plt.xlabel('Simulation Time')
+    plt.xlabel('Simulation Time in ms')
     plt.ylabel('PDUs')
     plt.title('PDU for case 1 vs Simulation Time')
     plt.grid(True)
@@ -119,7 +119,7 @@ def generate_plots_case1(time_points, pdu_counts, upf_counts, active_pdu_counts,
     # Plot UPF against simulation time
     plt.figure(figsize=(10, 6))
     plt.plot(time_points, upf_counts, label='UPF Count', color='green')
-    plt.xlabel('Simulation Time')
+    plt.xlabel('Simulation Time in ms')
     plt.ylabel('UPFs')
     plt.title('UPF for case 1 vs Simulation Time')
     plt.grid(True)
@@ -129,7 +129,7 @@ def generate_plots_case1(time_points, pdu_counts, upf_counts, active_pdu_counts,
 
     plt.figure(figsize=(10, 6))
     plt.plot(time_points, active_pdu_counts, label='Active PDUs', color='red')
-    plt.xlabel('Simulation Time')
+    plt.xlabel('Simulation Time in ms')
     plt.ylabel('Active PDUs')
     plt.title('Active PDUs for case 1 vs Simulation Time')
     plt.grid(True)
@@ -140,7 +140,7 @@ def generate_plots_case1(time_points, pdu_counts, upf_counts, active_pdu_counts,
     # Plot active UPFs against simulation time
     plt.figure(figsize=(10, 6))
     plt.plot(time_points, active_upf_counts, label='Active UPFs', color='orange')
-    plt.xlabel('Simulation Time')
+    plt.xlabel('Simulation Time in ms')
     plt.ylabel('Active UPFs')
     plt.title('Active UPFs for case 1 vs Simulation Time')
     plt.grid(True)

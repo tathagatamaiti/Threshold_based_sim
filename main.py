@@ -152,12 +152,12 @@ class Scheduler:
         """
         Generate a new PDU session event.
         """
-        message = f"Time: {self.current_time}, UE generates PDU session"
+        message = f"Time: {np.ceil(self.current_time)}, UE generates PDU session"
         self._log(message)
         session_id = self.session_counter
         self.session_counter += 1
-        duration = np.random.exponential(1/self.mu)
-        session = PDUSession(session_id, self.current_time, duration)
+        duration = (np.random.exponential(1/self.mu)*1000)
+        session = PDUSession(session_id, np.ceil(self.current_time), duration)
 
         # Find an available UPF
         if self.upf_case == 0:
@@ -165,7 +165,7 @@ class Scheduler:
         elif self.upf_case == 1:
             available_upf = self.get_upf_with_lowest_sessions() if self.upfs else None
         else:
-            message = f"Time: {self.current_time}, No UPF available"
+            message = f"Time: {np.ceil(self.current_time)}, No UPF available"
             self._log(message)
 
         # If no available UPF, scale out if possible
@@ -174,9 +174,9 @@ class Scheduler:
                 self.scale_out()
                 available_upf = self.upfs[-1]
             else:
-                message = f"Time: {self.current_time}, Cannot scale out due to maximum UPF instances reached"
+                message = f"Time: {np.ceil(self.current_time)}, Cannot scale out due to maximum UPF instances reached"
                 self._log(message)
-                message = (f"Time: {self.current_time}, Cannot assign PDU session to UPF because of resource "
+                message = (f"Time: {np.ceil(self.current_time)}, Cannot assign PDU session to UPF because of resource "
                            f"constraints, terminating PDU session")
                 self._log(message)
                 self.terminate_pdu_session(session)
@@ -187,18 +187,18 @@ class Scheduler:
                 self.scale_out()
                 available_upf = self.upfs[-1]
 
-            message = f"Time: {self.current_time}, UE sends PDU session {session_id} request to Compute Node"
+            message = f"Time: {np.ceil(self.current_time)}, UE sends PDU session {session_id} request to Compute Node"
             self._log(message)
             available_upf.add_session(session)
             self.active_sessions += 1
             self.update_free_slots()
-            end_event = Event(EVENT_TERMINATE_PDU_SESSION, self.current_time + duration)
+            end_event = Event(EVENT_TERMINATE_PDU_SESSION, np.ceil(self.current_time) + duration)
             heapq.heappush(self.event_queue, end_event)
 
-            message = (f"Time: {self.current_time}, Compute Node allocates UPF {available_upf.upf_id} for PDU session "
+            message = (f"Time: {np.ceil(self.current_time)}, Compute Node allocates UPF {available_upf.upf_id} for PDU session "
                        f"{session_id}")
             self._log(message)
-            message = f"Time: {self.current_time}, PDU Session {session_id} started on UPF {available_upf.upf_id}"
+            message = f"Time: {np.ceil(self.current_time)}, PDU Session {session_id} started on UPF {available_upf.upf_id}"
             self._log(message)
 
     def terminate_pdu_session(self, session):
@@ -212,7 +212,7 @@ class Scheduler:
             upf.remove_session(session)
             self.active_sessions -= 1
             self.update_free_slots()
-            message = f"Time: {self.current_time}, PDU Session {session.session_id} terminated on UPF {upf.upf_id}"
+            message = f"Time: {np.ceil(self.current_time)}, PDU Session {session.session_id} terminated on UPF {upf.upf_id}"
             self._log(message)
             if self.free_slots == self.scale_in_threshold and self.num_upf_instances >= self.min_upf_instances + 1:
                 self.scale_in(upf)
@@ -228,7 +228,7 @@ class Scheduler:
             self.upfs.append(new_upf)
             self.num_upf_instances += 1
             self.update_free_slots()
-            message = f"Time: {self.current_time}, Compute Node launches UPF {new_upf_id}"
+            message = f"Time: {np.ceil(self.current_time)}, Compute Node launches UPF {new_upf_id}"
             self._log(message)
 
     def scale_in(self, upf):
@@ -241,7 +241,7 @@ class Scheduler:
             self.upfs.remove(upf)
             self.num_upf_instances -= 1
             self.update_free_slots()
-            message = f"Time: {self.current_time}, Compute Node terminates UPF {upf.upf_id}"
+            message = f"Time: {np.ceil(self.current_time)}, Compute Node terminates UPF {upf.upf_id}"
             self._log(message)
 
     def run(self):
@@ -262,7 +262,7 @@ class Scheduler:
         generation_event = Event(EVENT_GENERATE_PDU_SESSION, 0)
         heapq.heappush(self.event_queue, generation_event)
 
-        while self.current_time < self.simulation_time or self.event_queue:
+        while np.ceil(self.current_time) < self.simulation_time or self.event_queue:
             if not self.event_queue:
                 break
 
@@ -273,13 +273,13 @@ class Scheduler:
             upf_counts.append(self.next_upf_id)  # Record UPF count
             active_pdu_counts.append(self.active_sessions)  # Record active PDU count
             active_upf_counts.append(self.num_upf_instances)  # Record active UPF count
-            time_points.append(self.current_time)  # Record time
+            time_points.append(np.ceil(self.current_time))  # Record time
 
             if event.event_type == EVENT_GENERATE_PDU_SESSION:
                 self.generate_pdu_session()
 
                 # Schedule the next PDU session generation
-                next_generation_time = self.current_time + np.random.exponential(1 / self.arrival_rate)
+                next_generation_time = np.ceil(self.current_time + (np.random.exponential(1 / self.arrival_rate)*1000))
                 if next_generation_time <= self.simulation_time:
                     generation_event = Event(EVENT_GENERATE_PDU_SESSION, next_generation_time)
                     heapq.heappush(self.event_queue, generation_event)
@@ -293,7 +293,7 @@ class Scheduler:
 
         # Terminate any remaining UPFs
         for upf in self.upfs:
-            message = f"Time: {self.current_time}, Compute Node terminates UPF {upf.upf_id}"
+            message = f"Time: {np.ceil(self.current_time)}, Compute Node terminates UPF {upf.upf_id}"
             self._log(message)
 
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
@@ -319,9 +319,9 @@ if __name__ == "__main__":
     parser.add_argument("--max-sessions-per-upf", type=int, default=8, help="Maximum number of sessions per UPF (C)")
     parser.add_argument("--scale-out-threshold", type=int, default=3, help="Scale-out threshold (T1)")
     parser.add_argument("--scale-in-threshold", type=int, default=13, help="Scale-in threshold (T2)")
-    parser.add_argument("--simulation-time", type=int, default=1000, help="Simulation time")
-    parser.add_argument("--arrival_rate", type=int, default=500, help="Inter-arrival rate (λ)")
-    parser.add_argument("--mu", type=int, default=1, help="parameter for session duration (µ)")
+    parser.add_argument("--simulation-time", type=int, default=10000, help="Simulation time in milliseconds")
+    parser.add_argument("--arrival_rate", type=int, default=500, help="Inter-arrival rate in seconds (λ)")
+    parser.add_argument("--mu", type=int, default=10, help="parameter for session duration in seconds (µ)")
     parser.add_argument("--output-file", type=str, default="simulation.log", help="File to write simulation outputs")
 
     args = parser.parse_args()

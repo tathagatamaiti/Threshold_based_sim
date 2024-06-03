@@ -1,8 +1,8 @@
+import csv
 import heapq
 import random
 import argparse
 import numpy as np
-import post_processing
 
 # Event types
 EVENT_GENERATE_PDU_SESSION = 1
@@ -156,7 +156,7 @@ class Scheduler:
         self._log(message)
         session_id = self.session_counter
         self.session_counter += 1
-        duration = (np.random.exponential(1/self.mu)*1000)
+        duration = (np.random.exponential(1 / self.mu) * 1000)
         session = PDUSession(session_id, np.ceil(self.current_time), duration)
 
         # Find an available UPF
@@ -183,9 +183,9 @@ class Scheduler:
 
         if available_upf:
             if (self.active_sessions == (self.num_upf_instances * self.max_sessions_per_upf) -
-                    self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
+                self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
                 self.scale_out()
-                available_upf = self.upfs[-1]
+            available_upf = self.upfs[-1]
 
             message = f"Time: {np.ceil(self.current_time)}, UE sends PDU session {session_id} request to Compute Node"
             self._log(message)
@@ -195,8 +195,9 @@ class Scheduler:
             end_event = Event(EVENT_TERMINATE_PDU_SESSION, np.ceil(self.current_time) + duration)
             heapq.heappush(self.event_queue, end_event)
 
-            message = (f"Time: {np.ceil(self.current_time)}, Compute Node allocates UPF {available_upf.upf_id} for PDU session "
-                       f"{session_id}")
+            message = (
+                f"Time: {np.ceil(self.current_time)}, Compute Node allocates UPF {available_upf.upf_id} for PDU session "
+                f"{session_id}")
             self._log(message)
             message = f"Time: {np.ceil(self.current_time)}, PDU Session {session_id} started on UPF {available_upf.upf_id}"
             self._log(message)
@@ -258,6 +259,22 @@ class Scheduler:
         active_upf_counts = []  # List to store active UPF counts
         time_points = []  # List to store time points
 
+        pdu_file = open('pdus.csv', 'w', newline='')
+        pdu_writer = csv.writer(pdu_file)
+        pdu_writer.writerow(['Time', 'PDUs'])
+
+        upf_file = open('upfs.csv', 'w', newline='')
+        upf_writer = csv.writer(upf_file)
+        upf_writer.writerow(['Time', 'UPFs'])
+
+        active_pdu_file = open('active_pdus.csv', 'w', newline='')
+        active_pdu_writer = csv.writer(active_pdu_file)
+        active_pdu_writer.writerow(['Time', 'Active PDUs'])
+
+        active_upf_file = open('active_upfs.csv', 'w', newline='')
+        active_upf_writer = csv.writer(active_upf_file)
+        active_upf_writer.writerow(['Time', 'Active UPFs'])
+
         # Schedule the initial PDU session generation
         generation_event = Event(EVENT_GENERATE_PDU_SESSION, 0)
         heapq.heappush(self.event_queue, generation_event)
@@ -275,11 +292,17 @@ class Scheduler:
             active_upf_counts.append(self.num_upf_instances)  # Record active UPF count
             time_points.append(np.ceil(self.current_time))  # Record time
 
+            pdu_writer.writerow([np.ceil(self.current_time), self.session_counter])
+            upf_writer.writerow([np.ceil(self.current_time), self.next_upf_id])
+            active_pdu_writer.writerow([np.ceil(self.current_time), self.active_sessions])
+            active_upf_writer.writerow([np.ceil(self.current_time), self.num_upf_instances])
+
             if event.event_type == EVENT_GENERATE_PDU_SESSION:
                 self.generate_pdu_session()
 
                 # Schedule the next PDU session generation
-                next_generation_time = np.ceil(self.current_time + (np.random.exponential(1 / self.arrival_rate)*1000))
+                next_generation_time = np.ceil(
+                    self.current_time + (np.random.exponential(1 / self.arrival_rate) * 1000))
                 if next_generation_time <= self.simulation_time:
                     generation_event = Event(EVENT_GENERATE_PDU_SESSION, next_generation_time)
                     heapq.heappush(self.event_queue, generation_event)
@@ -296,19 +319,13 @@ class Scheduler:
             message = f"Time: {np.ceil(self.current_time)}, Compute Node terminates UPF {upf.upf_id}"
             self._log(message)
 
+        pdu_file.close()
+        upf_file.close()
+        active_pdu_file.close()
+        active_upf_file.close()
+
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
                   f"Total UPFs deployed: {self.next_upf_id}.")
-
-        # Generate plots
-        if self.upf_case == 0:
-            post_processing.generate_plots_case0(time_points, pdu_counts, upf_counts, active_pdu_counts,
-                                                 active_upf_counts)
-        elif self.upf_case == 1:
-            post_processing.generate_plots_case1(time_points, pdu_counts, upf_counts, active_pdu_counts,
-                                                 active_upf_counts)
-        else:
-            message = f"No plots to show, invalid sorting case"
-            self._log(message)
 
 
 if __name__ == "__main__":

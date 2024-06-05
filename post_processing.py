@@ -14,7 +14,7 @@ plt.xlabel('Simulation Time in ms')
 plt.ylabel('PDUs')
 plt.title('PDUs vs Simulation Time')
 plt.grid(True)
-plt.savefig('pdu_vs_simulation_time.png')
+plt.savefig('pdu_vs_simulation_time_case1.png')
 plt.show()
 
 # Plot UPF against simulation time
@@ -24,7 +24,7 @@ plt.xlabel('Simulation Time in ms')
 plt.ylabel('UPFs')
 plt.title('UPFs vs Simulation Time')
 plt.grid(True)
-plt.savefig('upf_vs_simulation_time.png')
+plt.savefig('upf_vs_simulation_time_case1.png')
 plt.show()
 
 # Plot active PDUs against simulation time
@@ -34,7 +34,7 @@ plt.xlabel('Simulation Time in ms')
 plt.ylabel('Active PDUs')
 plt.title('Active PDUs vs Simulation Time')
 plt.grid(True)
-plt.savefig('active_pdus_vs_simulation_time.png')
+plt.savefig('active_pdus_vs_simulation_time_case1.png')
 plt.show()
 
 # Plot active UPFs against simulation time
@@ -44,23 +44,42 @@ plt.xlabel('Simulation Time in ms')
 plt.ylabel('Active UPFs')
 plt.title('Active UPFs vs Simulation Time')
 plt.grid(True)
-plt.savefig('active_upfs_vs_simulation_time.png')
+plt.savefig('active_upfs_vs_simulation_time_case1.png')
 plt.show()
 
-# Create histograms for active PDUs
+active_pdus['Time'] = pd.to_datetime(active_pdus['Time'])
+active_upfs['Time'] = pd.to_datetime(active_upfs['Time'])
+
+active_pdus['Next_Time'] = active_pdus['Time'].shift(-1)
+active_pdus['Duration'] = ((active_pdus['Next_Time'] - active_pdus['Time']).fillna(pd.Timedelta(seconds=0)).
+                           dt.total_seconds())
+
+active_upfs['Next_Time'] = active_upfs['Time'].shift(-1)
+active_upfs['Duration'] = ((active_upfs['Next_Time'] - active_upfs['Time']).fillna(pd.Timedelta(seconds=0)).
+                           dt.total_seconds())
+
+duration_data_pdus = active_pdus[active_pdus['Active PDUs'] != active_pdus['Active PDUs'].shift(-1)]
+duration_data_upfs = active_upfs[active_upfs['Active UPFs'] != active_upfs['Active UPFs'].shift(-1)]
+
+duration_by_pdu = duration_data_pdus.groupby('Active PDUs')['Duration'].sum()
+duration_by_upf = duration_data_upfs.groupby('Active UPFs')['Duration'].sum()
+
+# Plot the total duration each 'Active UPFs' value is observed
 plt.figure(figsize=(10, 10))
-plt.hist(active_pdus['Active PDUs'], bins=20, edgecolor='black')
-plt.xlabel('Number of Active PDUs')
-plt.ylabel('Frequency')
-plt.title('Frequency of Active PDUs')
-plt.savefig('active_pdus_hist.png')
+duration_by_pdu.plot(kind='bar', color='blue', edgecolor='black')
+plt.xlabel('Active PDUs')
+plt.ylabel('Total Time Observed (seconds)')
+plt.title('Total Time Each Active PDU is Observed')
+plt.grid(True)
+plt.savefig('active_pdu_histogram_case1.png')
 plt.show()
 
-# Create histograms for active UPFs
+# Plot the total duration each 'Active UPFs' value is observed
 plt.figure(figsize=(10, 10))
-plt.hist(active_upfs['Active UPFs'], bins=20, edgecolor='black')
-plt.xlabel('Number of Active UPFs')
-plt.ylabel('Frequency')
-plt.title('Frequency of Active UPFs')
-plt.savefig('active_upfs_hist.png')
+duration_by_upf.plot(kind='bar', color='green', edgecolor='black')
+plt.xlabel('Active UPFs')
+plt.ylabel('Total Time Observed (seconds)')
+plt.title('Total Time Each Active UPF is Observed')
+plt.grid(True)
+plt.savefig('active_upf_histogram_case1.png')
 plt.show()

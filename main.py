@@ -204,7 +204,7 @@ class Scheduler:
 
     def terminate_pdu_session(self, session):
         """
-        Terminate a PDU session.
+        Terminate a PDU session and perform service migration if necessary.
 
         :param session: Session to be terminated.
         """
@@ -213,8 +213,33 @@ class Scheduler:
             upf.remove_session(session)
             self.active_sessions -= 1
             self.update_free_slots()
-            message = f"Time: {np.ceil(self.current_time)}, PDU Session {session.session_id} terminated on UPF {upf.upf_id}"
+            message = (f"Time: {np.ceil(self.current_time)}, PDU Session {session.session_id} "
+                       f"terminated on UPF {upf.upf_id}")
             self._log(message)
+
+            sorted_upfs = sorted(self.upfs, key=lambda upf: len(upf.sessions), reverse=True)
+
+            # Service migration
+            for dest_upf in sorted_upfs:
+                if len(dest_upf.sessions) < self.max_sessions_per_upf:
+                    available_slots = self.max_sessions_per_upf - len(dest_upf.sessions)
+                    for src_upf in sorted(self.upfs, key=lambda upf: len(upf.sessions)):
+                        if src_upf != dest_upf and len(src_upf.sessions) > 0:
+                            sessions_to_migrate = min(available_slots, len(src_upf.sessions))
+                            for _ in range(sessions_to_migrate):
+                                session_to_migrate = src_upf.sessions.pop(0)
+                                dest_upf.add_session(session_to_migrate)
+                                available_slots -= 1
+                                message = (
+                                    f"Time: {np.ceil(self.current_time)}, PDU Session {session_to_migrate.session_id} "
+                                    f"migrated from UPF {src_upf.upf_id} to UPF {dest_upf.upf_id}")
+                                self._log(message)
+
+                            if (len(src_upf.sessions) == 0 and self.free_slots == self.scale_in_threshold and
+                                    self.num_upf_instances >= self.min_upf_instances + 1):
+                                self.scale_in(src_upf)
+                                break
+
             if self.free_slots == self.scale_in_threshold and self.num_upf_instances >= self.min_upf_instances + 1:
                 self.scale_in(upf)
 
@@ -330,7 +355,7 @@ class Scheduler:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Event-based scheduler simulation")
-    parser.add_argument("--upf_case", type=int, default=1, help="Case for UPF sorting")
+    parser.add_argument("--upf_case", type=int, default=0, help="Case for UPF sorting")
     parser.add_argument("--max-upf-instances", type=int, default=110, help="Maximum number of UPF instances (L)")
     parser.add_argument("--min-upf-instances", type=int, default=1, help="Minimum number of UPF instances (M)")
     parser.add_argument("--max-sessions-per-upf", type=int, default=8, help="Maximum number of sessions per UPF (C)")

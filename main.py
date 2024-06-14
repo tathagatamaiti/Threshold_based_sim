@@ -90,7 +90,7 @@ class Scheduler:
     """
 
     def __init__(self, upf_case, max_upf_instances, min_upf_instances, max_sessions_per_upf, scale_out_threshold,
-                 scale_in_threshold, simulation_time, arrival_rate, mu, output_file):
+                 scale_in_threshold, simulation_time, arrival_rate, mu, migration_case, output_file):
         """
         Initialize the scheduler with simulation parameters.
 
@@ -103,6 +103,7 @@ class Scheduler:
         :param simulation_time: Total simulation time.
         :param arrival_rate: Rate of session arrival (λ).
         :param mu: Session duration parameter (µ).
+        :param migration_case: Case for session migration.
         :param output_file: File to write simulation outputs.
         """
         self.event_queue = []
@@ -115,6 +116,7 @@ class Scheduler:
         self.scale_in_threshold = scale_in_threshold
         self.arrival_rate = arrival_rate
         self.mu = mu
+        self.migration_case = migration_case
         self.num_upf_instances = 0
         self.next_upf_id = 0
         self.session_counter = 0
@@ -160,9 +162,9 @@ class Scheduler:
         session = PDUSession(session_id, np.ceil(self.current_time), duration)
 
         # Find an available UPF
-        if self.upf_case == 0:
+        if self.upf_case == 1:
             available_upf = next((upf for upf in self.upfs if len(upf.sessions) < self.max_sessions_per_upf), None)
-        elif self.upf_case == 1:
+        elif self.upf_case == 2:
             available_upf = self.get_upf_with_lowest_sessions() if self.upfs else None
         else:
             message = f"Time: {np.ceil(self.current_time)}, No UPF available"
@@ -183,9 +185,8 @@ class Scheduler:
 
         if available_upf:
             if (self.active_sessions == (self.num_upf_instances * self.max_sessions_per_upf) -
-                self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
+                    self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
                 self.scale_out()
-            available_upf = self.upfs[-1]
 
             message = f"Time: {np.ceil(self.current_time)}, UE sends PDU session {session_id} request to Compute Node"
             self._log(message)
@@ -203,11 +204,6 @@ class Scheduler:
             self._log(message)
 
     def terminate_pdu_session(self, session):
-        """
-        Terminate a PDU session and perform service migration if necessary.
-
-        :param session: Session to be terminated.
-        """
         upf = next((upf for upf in self.upfs if session in upf.sessions), None)
         if upf:
             upf.remove_session(session)
@@ -216,32 +212,100 @@ class Scheduler:
             message = (f"Time: {np.ceil(self.current_time)}, PDU Session {session.session_id} "
                        f"terminated on UPF {upf.upf_id}")
             self._log(message)
+            if self.migration_case == 1:
+                # Case 1: No migration and uses scale-in threshold for termination
+                if self.free_slots == self.scale_in_threshold and self.num_upf_instances >= self.min_upf_instances + 1:
+                    self.scale_in(upf)
 
-            sorted_upfs = sorted(self.upfs, key=lambda upf: len(upf.sessions), reverse=True)
-
-            # Service migration
-            for dest_upf in sorted_upfs:
-                if len(dest_upf.sessions) < self.max_sessions_per_upf:
-                    available_slots = self.max_sessions_per_upf - len(dest_upf.sessions)
-                    for src_upf in sorted(self.upfs, key=lambda upf: len(upf.sessions)):
-                        if src_upf != dest_upf and len(src_upf.sessions) > 0:
-                            sessions_to_migrate = min(available_slots, len(src_upf.sessions))
-                            for _ in range(sessions_to_migrate):
-                                session_to_migrate = src_upf.sessions.pop(0)
-                                dest_upf.add_session(session_to_migrate)
-                                available_slots -= 1
-                                message = (
-                                    f"Time: {np.ceil(self.current_time)}, PDU Session {session_to_migrate.session_id} "
-                                    f"migrated from UPF {src_upf.upf_id} to UPF {dest_upf.upf_id}")
-                                self._log(message)
-
-                            if (len(src_upf.sessions) == 0 and self.free_slots == self.scale_in_threshold and
-                                    self.num_upf_instances >= self.min_upf_instances + 1):
-                                self.scale_in(src_upf)
-                                break
-
-            if self.free_slots == self.scale_in_threshold and self.num_upf_instances >= self.min_upf_instances + 1:
+            if self.migration_case == 2:
+                # Case 2: No migration and doesn't use scale-in threshold for termination
                 self.scale_in(upf)
+
+            if self.migration_case == 3:
+                # Case 3: UPFs accept PDUs even after migration and uses scale-in threshold for termination
+                sorted_upfs = sorted(self.upfs, key=lambda x: len(x.sessions), reverse=True)
+                target_upf = next((u for u in sorted_upfs if
+                                   u != upf and len(u.sessions) + len(upf.sessions) <= self.max_sessions_per_upf), None)
+
+                if target_upf:
+                    for s in upf.sessions:
+                        target_upf.add_session(s)
+                        upf.remove_session(s)
+                        message = (f"Time: {np.ceil(self.current_time)}, PDU Session {s.session_id} "
+                                   f"migrated from UPF {upf.upf_id} to UPF {target_upf.upf_id}")
+                        self._log(message)
+
+                if (len(upf.sessions) == 0 and self.free_slots >= self.scale_in_threshold and
+                        self.num_upf_instances > self.min_upf_instances):
+                    self.scale_in(upf)
+
+            elif self.migration_case == 4:
+                # Case 4: UPFs accept PDUs even after migration and doesn't use scale-in threshold
+                sorted_upfs = sorted(self.upfs, key=lambda x: len(x.sessions), reverse=True)
+                target_upf = next((u for u in sorted_upfs if
+                                   u != upf and len(u.sessions) + len(upf.sessions) <= self.max_sessions_per_upf), None)
+
+                if target_upf:
+                    for s in upf.sessions:
+                        target_upf.add_session(s)
+                        upf.remove_session(s)
+                        message = (f"Time: {np.ceil(self.current_time)}, PDU Session {s.session_id} "
+                                   f"migrated from UPF {upf.upf_id} to UPF {target_upf.upf_id}")
+                        self._log(message)
+
+                if len(upf.sessions) == 0:
+                    self.scale_in(upf)
+
+            elif self.migration_case == 5:
+                # Case 5: UPFs do not accept PDUs after migration and uses scale-in threshold
+                sorted_upfs = sorted(self.upfs, key=lambda x: len(x.sessions), reverse=True)
+                migrated_upfs = set()
+                target_upf = None
+                for u in sorted_upfs:
+                    if u != upf and u not in migrated_upfs:
+                        if len(u.sessions) + len(upf.sessions) <= self.max_sessions_per_upf:
+                            target_upf = u
+                            break
+
+                if target_upf:
+                    migrated_sessions = []
+                    for s in upf.sessions:
+                        migrated_sessions.append(s)
+                        target_upf.add_session(s)
+                        upf.remove_session(s)
+                        message = (f"Time: {np.ceil(self.current_time)}, PDU Session {s.session_id} "
+                                   f"migrated from UPF {upf.upf_id} to UPF {target_upf.upf_id}")
+                        self._log(message)
+                    migrated_upfs.add(upf)
+
+                if (len(upf.sessions) == 0 and self.free_slots >= self.scale_in_threshold and
+                        self.num_upf_instances > self.min_upf_instances):
+                    self.scale_in(upf)
+
+            elif self.migration_case == 6:
+                # Case 6: UPFs do not accept PDUs after migration and doesn't use scale-in threshold
+                sorted_upfs = sorted(self.upfs, key=lambda x: len(x.sessions), reverse=True)
+                migrated_upfs = set()
+                target_upf = None
+                for u in sorted_upfs:
+                    if u != upf and u not in migrated_upfs:
+                        if len(u.sessions) + len(upf.sessions) <= self.max_sessions_per_upf:
+                            target_upf = u
+                            break
+
+                if target_upf:
+                    migrated_sessions = []
+                    for s in upf.sessions:
+                        migrated_sessions.append(s)
+                        target_upf.add_session(s)
+                        upf.remove_session(s)
+                        message = (f"Time: {np.ceil(self.current_time)}, PDU Session {s.session_id} "
+                                   f"migrated from UPF {upf.upf_id} to UPF {target_upf.upf_id}")
+                        self._log(message)
+                    migrated_upfs.add(upf)
+
+                if len(upf.sessions) == 0:
+                    self.scale_in(upf)
 
     def scale_out(self):
         """
@@ -355,7 +419,7 @@ class Scheduler:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Event-based scheduler simulation")
-    parser.add_argument("--upf_case", type=int, default=0, help="Case for UPF sorting")
+    parser.add_argument("--upf_case", type=int, default=2, help="Case for UPF sorting")
     parser.add_argument("--max-upf-instances", type=int, default=110, help="Maximum number of UPF instances (L)")
     parser.add_argument("--min-upf-instances", type=int, default=1, help="Minimum number of UPF instances (M)")
     parser.add_argument("--max-sessions-per-upf", type=int, default=8, help="Maximum number of sessions per UPF (C)")
@@ -364,11 +428,12 @@ if __name__ == "__main__":
     parser.add_argument("--simulation-time", type=int, default=10000, help="Simulation time in milliseconds")
     parser.add_argument("--arrival_rate", type=int, default=500, help="Inter-arrival rate in seconds (λ)")
     parser.add_argument("--mu", type=int, default=10, help="parameter for session duration in seconds (µ)")
+    parser.add_argument("--migration_case", type=int, default=6, help="Case for session migration")
     parser.add_argument("--output-file", type=str, default="simulation.log", help="File to write simulation outputs")
 
     args = parser.parse_args()
 
     scheduler = Scheduler(args.upf_case, args.max_upf_instances, args.min_upf_instances, args.max_sessions_per_upf,
                           args.scale_out_threshold, args.scale_in_threshold, args.simulation_time, args.arrival_rate,
-                          args.mu, args.output_file)
+                          args.mu, args.migration_case, args.output_file)
     scheduler.run()

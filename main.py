@@ -143,10 +143,14 @@ class Scheduler:
 
     def get_upf_with_lowest_sessions(self):
         """
-        Get the UPF with the lowest number of sessions.
+        Get the UPF with the lowest number of sessions, while respecting the max_sessions_per_upf limit.
         If multiple UPFs have the same lowest number of sessions, randomly select one.
         """
-        upfs_sorted = sorted(self.upfs, key=lambda upf: len(upf.sessions))
+        upfs_under_limit = [upf for upf in self.upfs if len(upf.sessions) < self.max_sessions_per_upf]
+        if not upfs_under_limit:
+            return None
+
+        upfs_sorted = sorted(upfs_under_limit, key=lambda upf: len(upf.sessions))
         lowest_sessions_upfs = [upf for upf in upfs_sorted if len(upf.sessions) == len(upfs_sorted[0].sessions)]
         return random.choice(lowest_sessions_upfs)
 

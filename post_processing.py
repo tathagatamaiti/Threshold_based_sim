@@ -6,6 +6,7 @@ pdus = pd.read_csv('pdus.csv')
 upfs = pd.read_csv('upfs.csv')
 active_pdus = pd.read_csv('active_pdus.csv')
 active_upfs = pd.read_csv('active_upfs.csv')
+free_slots = pd.read_csv('free_slots.csv')
 
 # Plot PDU against simulation time
 plt.figure(figsize=(10, 10))
@@ -47,13 +48,25 @@ plt.grid(True)
 plt.savefig('active_upfs_vs_simulation_time.png')
 plt.show()
 
+# Plot active UPFs against simulation time
+plt.figure(figsize=(10, 10))
+plt.plot(free_slots['Free Slots'], color='purple')
+plt.xlabel('Simulation Time in ms')
+plt.ylabel('Free Slots')
+plt.title('Free Slots vs Simulation Time')
+plt.grid(True)
+plt.savefig('free_slots_vs_simulation_time.png')
+plt.show()
+
 # Calculate the duration for each interval where the number of active UPFs remains constant
 active_pdus['Duration'] = active_pdus['Time'].diff().shift(-1)
 active_upfs['Duration'] = active_upfs['Time'].diff().shift(-1)
+free_slots['Duration'] = free_slots['Time'].diff().shift(-1)
 
 # Group by 'Active UPFs' and sum the durations
 duration_by_pdu = active_pdus.groupby('Active PDUs')['Duration'].sum()
 duration_by_upf = active_upfs.groupby('Active UPFs')['Duration'].sum()
+duration_by_free_slots = free_slots.groupby('Free Slots')['Duration'].sum()
 
 # Normalize by the total time to get the PDF
 total_time = duration_by_pdu.sum()
@@ -62,9 +75,13 @@ pdf_by_pdu = duration_by_pdu / total_time
 total_time = duration_by_upf.sum()
 pdf_by_upf = duration_by_upf / total_time
 
+total_time = duration_by_free_slots.sum()
+pdf_by_free_slots = duration_by_free_slots / total_time
+
 # Convert to a DataFrame for better readability
 pdf_pdu = pdf_by_pdu.reset_index().rename(columns={'Duration': 'PDF'})
 pdf_upf = pdf_by_upf.reset_index().rename(columns={'Duration': 'PDF'})
+pdf_free_slots = pdf_by_free_slots.reset_index().rename(columns={'Duration': 'PDF'})
 
 # Plot the PDF of active PDUs
 plt.figure(figsize=(10, 10))
@@ -85,4 +102,14 @@ plt.ylabel('PDF')
 plt.title('Probability Density Function of Active UPFs')
 plt.xticks(pdf_upf['Active UPFs'])
 plt.savefig('active_upfs_pdf.png')
+plt.show()
+
+# Plot the PDF of Free Slots
+plt.figure(figsize=(10, 10))
+plt.bar(pdf_free_slots['Free Slots'], pdf_free_slots['PDF'], edgecolor='k', alpha=0.7)
+plt.xlabel('Free Slots')
+plt.ylabel('PDF')
+plt.title('Probability Density Function of Free Slots')
+plt.xticks(pdf_free_slots['Free Slots'])
+plt.savefig('free_slots_pdf.png')
 plt.show()

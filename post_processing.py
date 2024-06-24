@@ -10,7 +10,7 @@ free_slots = pd.read_csv('free_slots.csv')
 
 # Plot PDU against simulation time
 plt.figure(figsize=(10, 10))
-plt.plot(pdus['PDUs'], color='blue')
+plt.plot(pdus['Time'], pdus['PDUs'], color='blue')
 plt.xlabel('Simulation Time in ms')
 plt.ylabel('PDUs')
 plt.title('PDUs vs Simulation Time')
@@ -20,7 +20,7 @@ plt.show()
 
 # Plot UPF against simulation time
 plt.figure(figsize=(10, 10))
-plt.plot(upfs['UPFs'], color='green')
+plt.plot(upfs['Time'], upfs['UPFs'], color='green')
 plt.xlabel('Simulation Time in ms')
 plt.ylabel('UPFs')
 plt.title('UPFs vs Simulation Time')
@@ -30,7 +30,7 @@ plt.show()
 
 # Plot active PDUs against simulation time
 plt.figure(figsize=(10, 10))
-plt.plot(active_pdus['Active PDUs'], color='red')
+plt.plot(active_pdus['Time'], active_pdus['Active PDUs'], color='red')
 plt.xlabel('Simulation Time in ms')
 plt.ylabel('Active PDUs')
 plt.title('Active PDUs vs Simulation Time')
@@ -40,7 +40,7 @@ plt.show()
 
 # Plot active UPFs against simulation time
 plt.figure(figsize=(10, 10))
-plt.plot(active_upfs['Active UPFs'], color='orange')
+plt.plot(active_upfs['Time'], active_upfs['Active UPFs'], color='orange')
 plt.xlabel('Simulation Time in ms')
 plt.ylabel('Active UPFs')
 plt.title('Active UPFs vs Simulation Time')

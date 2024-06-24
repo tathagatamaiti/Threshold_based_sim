@@ -89,11 +89,13 @@ class Scheduler:
     Implements the event-based scheduler simulation.
     """
 
-    def __init__(self, upf_case, max_upf_instances, min_upf_instances, max_sessions_per_upf, scale_out_threshold,
-                 scale_in_threshold, simulation_time, arrival_rate, mu, migration_case, output_file):
+    def __init__(self, run_id, upf_case, max_upf_instances, min_upf_instances, max_sessions_per_upf, scale_out_threshold,
+                 scale_in_threshold, simulation_time, arrival_rate, mu, migration_case, output_file, seed=None):
         """
         Initialize the scheduler with simulation parameters.
 
+        :param run_id: ID of simulation run
+        :param seed: Seed for reproducibility of the experiment
         :param upf_case: Case for UPF sorting.
         :param max_upf_instances: Maximum number of UPF instances (L).
         :param min_upf_instances: Minimum number of UPF instances (M).
@@ -108,6 +110,8 @@ class Scheduler:
         """
         self.event_queue = []
         self.upfs = []
+        self.run_id = run_id
+        self.seed = seed
         self.upf_case = upf_case
         self.max_upf_instances = max_upf_instances
         self.min_upf_instances = min_upf_instances
@@ -125,6 +129,10 @@ class Scheduler:
         self.active_sessions = 0  # I: number of sessions being served
         self.free_slots = 0  # U: number of free slots in the system
         self.output_file = output_file
+
+        if self.seed is not None:
+            random.seed(self.seed)
+            np.random.seed(self.seed)
 
     def _log(self, message):
         """
@@ -374,23 +382,23 @@ class Scheduler:
         free_slots = []
         time_points = []  # List to store time points
 
-        pdu_file = open('pdus.csv', 'w', newline='')
+        pdu_file = open(f'Data/pdus_{self.run_id}.csv', 'w', newline='')
         pdu_writer = csv.writer(pdu_file)
         pdu_writer.writerow(['Time', 'PDUs'])
 
-        upf_file = open('upfs.csv', 'w', newline='')
+        upf_file = open(f'Data/upfs_{self.run_id}.csv', 'w', newline='')
         upf_writer = csv.writer(upf_file)
         upf_writer.writerow(['Time', 'UPFs'])
 
-        active_pdu_file = open('active_pdus.csv', 'w', newline='')
+        active_pdu_file = open(f'Data/active_pdus_{self.run_id}.csv', 'w', newline='')
         active_pdu_writer = csv.writer(active_pdu_file)
         active_pdu_writer.writerow(['Time', 'Active PDUs'])
 
-        active_upf_file = open('active_upfs.csv', 'w', newline='')
+        active_upf_file = open(f'Data/active_upfs_{self.run_id}.csv', 'w', newline='')
         active_upf_writer = csv.writer(active_upf_file)
         active_upf_writer.writerow(['Time', 'Active UPFs'])
 
-        free_slots_file = open('free_slots.csv', 'w', newline='')
+        free_slots_file = open(f'Data/free_slots_{self.run_id}.csv', 'w', newline='')
         free_slots_writer = csv.writer(free_slots_file)
         free_slots_writer.writerow(['Time', 'Free Slots'])
 
@@ -449,6 +457,7 @@ class Scheduler:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Event-based scheduler simulation")
+    parser.add_argument("--run_id", type=int, default=1, help="ID of simulation run")
     parser.add_argument("--upf_case", type=int, default=2, help="Case for UPF sorting")
     parser.add_argument("--max-upf-instances", type=int, default=100, help="Maximum number of UPF instances (L)")
     parser.add_argument("--min-upf-instances", type=int, default=1, help="Minimum number of UPF instances (M)")
@@ -460,10 +469,12 @@ if __name__ == "__main__":
     parser.add_argument("--mu", type=float, default=0.0167, help="parameter for session duration in seconds (µ)")
     parser.add_argument("--migration_case", type=int, default=1, help="Case for session migration")
     parser.add_argument("--output-file", type=str, default="simulation.log", help="File to write simulation outputs")
+    parser.add_argument("--seed", type=int, default=None, help="Seed for random number generation")
 
     args = parser.parse_args()
 
-    scheduler = Scheduler(args.upf_case, args.max_upf_instances, args.min_upf_instances, args.max_sessions_per_upf,
-                          args.scale_out_threshold, args.scale_in_threshold, args.simulation_time, args.arrival_rate,
-                          args.mu, args.migration_case, args.output_file)
+    scheduler = Scheduler(args.run_id, args.upf_case, args.max_upf_instances, args.min_upf_instances,
+                          args.max_sessions_per_upf, args.scale_out_threshold, args.scale_in_threshold,
+                          args.simulation_time, args.arrival_rate, args.mu, args.migration_case, args.output_file,
+                          args.seed)
     scheduler.run()

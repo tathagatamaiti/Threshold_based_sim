@@ -128,6 +128,7 @@ class Scheduler:
         self.simulation_time = simulation_time
         self.active_sessions = 0  # I: number of sessions being served
         self.free_slots = 0  # U: number of free slots in the system
+        self.rejected_sessions = 0
         self.output_file = output_file
 
         if self.seed is not None:
@@ -209,6 +210,7 @@ class Scheduler:
                 self.scale_out()
                 available_upf = self.upfs[-1]
             else:
+                self.rejected_sessions += 1
                 message = f"Time: {np.ceil(self.current_time)}, Cannot scale out due to maximum UPF instances reached"
                 self._log(message)
                 message = (f"Time: {np.ceil(self.current_time)}, Cannot assign PDU session to UPF because of resource "
@@ -380,6 +382,7 @@ class Scheduler:
         active_pdu_counts = []  # List to store active PDU counts
         active_upf_counts = []  # List to store active UPF counts
         free_slots = []
+        rejected_sessions = []
         time_points = []  # List to store time points
 
         pdu_file = open(f'Data/pdus_{self.run_id}.csv', 'w', newline='')
@@ -402,6 +405,10 @@ class Scheduler:
         free_slots_writer = csv.writer(free_slots_file)
         free_slots_writer.writerow(['Time', 'Free Slots'])
 
+        rejected_sessions_file = open(f'Data/rejected_sessions_{self.run_id}.csv', 'w', newline='')
+        rejected_sessions_writer = csv.writer(rejected_sessions_file)
+        rejected_sessions_writer.writerow(['Time', 'Rejected Sessions'])
+
         # Schedule the initial PDU session generation
         generation_event = Event(EVENT_GENERATE_PDU_SESSION, 0)
         heapq.heappush(self.event_queue, generation_event)
@@ -416,12 +423,14 @@ class Scheduler:
             active_upf_counts.append(self.num_upf_instances)  # Record active UPF count
             time_points.append(np.ceil(self.current_time))  # Record time
             free_slots.append(self.free_slots)
+            rejected_sessions.append(self.rejected_sessions)
 
             pdu_writer.writerow([np.ceil(self.current_time), self.session_counter])
             upf_writer.writerow([np.ceil(self.current_time), self.next_upf_id])
             active_pdu_writer.writerow([np.ceil(self.current_time), self.active_sessions])
             active_upf_writer.writerow([np.ceil(self.current_time), self.num_upf_instances])
             free_slots_writer.writerow([np.ceil(self.current_time), self.free_slots])
+            rejected_sessions_writer.writerow([np.ceil(self.current_time), self.rejected_sessions])
 
             if event.event_type == EVENT_GENERATE_PDU_SESSION:
                 self.generate_pdu_session()
@@ -450,9 +459,11 @@ class Scheduler:
         active_pdu_file.close()
         active_upf_file.close()
         free_slots_file.close()
+        rejected_sessions_file.close()
 
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
-                  f"Total UPFs deployed: {self.next_upf_id}.")
+                  f"Total UPFs deployed: {self.next_upf_id}."
+                  f"Rejected sessions: {self.rejected_sessions}.")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import pandas as pd
 
 def main():
     parser = argparse.ArgumentParser(description='Post-process simulation results')
-    parser.add_argument('--input-files', type=str, nargs=5, required=True, help='Input CSV files to process')
+    parser.add_argument('--input-files', type=str, nargs=6, required=True, help='Input CSV files to process')
     args = parser.parse_args()
 
     process_results(args.input_files)
@@ -19,6 +19,7 @@ def process_results(input_files):
     active_pdus = pd.read_csv(input_files[2])
     active_upfs = pd.read_csv(input_files[3])
     free_slots = pd.read_csv(input_files[4])
+    rejected_sessions = pd.read_csv(input_files[5])
 
     # Plot PDU against simulation time
     plt.figure(figsize=(10, 10))
@@ -60,14 +61,24 @@ def process_results(input_files):
     plt.savefig('../Results/active_upfs_vs_simulation_time.png')
     plt.show()
 
-    # Plot active UPFs against simulation time
+    # Plot free slots against simulation time
     plt.figure(figsize=(10, 10))
-    plt.plot(free_slots['Free Slots'], color='purple')
+    plt.plot(free_slots['Time'], free_slots['Free Slots'], color='purple')
     plt.xlabel('Simulation Time in ms')
     plt.ylabel('Free Slots')
     plt.title('Free Slots vs Simulation Time')
     plt.grid(True)
     plt.savefig('../Results/free_slots_vs_simulation_time.png')
+    plt.show()
+
+    # Plot rejected sessions against simulation time
+    plt.figure(figsize=(10, 10))
+    plt.plot(rejected_sessions['Time'], rejected_sessions['Rejected Sessions'], color='black')
+    plt.xlabel('Simulation Time in ms')
+    plt.ylabel('Rejected Sessions')
+    plt.title('Rejected Sessions vs Simulation Time')
+    plt.grid(True)
+    plt.savefig('../Results/rejected_sessions_vs_simulation_time.png')
     plt.show()
 
     # Calculate the duration for each interval where the number of active UPFs remains constant

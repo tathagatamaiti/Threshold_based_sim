@@ -83,13 +83,22 @@ class UPF:
         """
         self.sessions.remove(session)
 
+    def is_busy(self):
+        """
+        Check if the UPF has any active sessions.
+
+        :return: True if the UPF has active sessions, False otherwise.
+        """
+        return len(self.sessions) > 0
+
 
 class Scheduler:
     """
     Implements the event-based scheduler simulation.
     """
 
-    def __init__(self, run_id, upf_case, max_upf_instances, min_upf_instances, max_sessions_per_upf, scale_out_threshold,
+    def __init__(self, run_id, upf_case, max_upf_instances, min_upf_instances, max_sessions_per_upf,
+                 scale_out_threshold,
                  scale_in_threshold, simulation_time, arrival_rate, mu, migration_case, output_file, seed=None):
         """
         Initialize the scheduler with simulation parameters.
@@ -129,6 +138,8 @@ class Scheduler:
         self.active_sessions = 0  # I: number of sessions being served
         self.free_slots = 0  # U: number of free slots in the system
         self.rejected_sessions = 0
+        self.busy_upfs = 0  # Number of UPFs with active PDU sessions
+        self.idle_upfs = 0  # Number of UPFs without active PDU sessions
         self.output_file = output_file
 
         if self.seed is not None:
@@ -155,6 +166,13 @@ class Scheduler:
         Update the number of free slots in the system.
         """
         self.active_sessions = sum(len(upf.sessions) for upf in self.upfs)
+
+    def update_upf_status(self):
+        """
+        Update the number of busy and idle UPFs in the system.
+        """
+        self.busy_upfs = sum(1 for upf in self.upfs if upf.is_busy())
+        self.idle_upfs = self.num_upf_instances - self.busy_upfs
 
     def get_upf_with_lowest_sessions(self):
         """
@@ -186,6 +204,7 @@ class Scheduler:
         """
         Generate a new PDU session event.
         """
+        global available_upf
         message = f"Time: {np.ceil(self.current_time)}, UE generates PDU session"
         self._log(message)
         session_id = self.session_counter
@@ -228,14 +247,16 @@ class Scheduler:
             available_upf.add_session(session)
             self.update_active_sessions()
             self.update_free_slots()
+            self.update_upf_status()
             end_event = Event(EVENT_TERMINATE_PDU_SESSION, np.ceil(self.current_time) + duration)
             heapq.heappush(self.event_queue, end_event)
 
             message = (
-                f"Time: {np.ceil(self.current_time)}, Compute Node allocates UPF {available_upf.upf_id} for PDU session "
+                f"Time: {np.ceil(self.current_time)}, Compute Node allocates UPF {available_upf.upf_id} for PDU session"
                 f"{session_id}")
             self._log(message)
-            message = f"Time: {np.ceil(self.current_time)}, PDU Session {session_id} started on UPF {available_upf.upf_id}"
+            message = (f"Time: {np.ceil(self.current_time)}, PDU Session {session_id} "
+                       f"started on UPF {available_upf.upf_id}")
             self._log(message)
 
     def terminate_pdu_session(self, session):
@@ -244,6 +265,7 @@ class Scheduler:
             upf.remove_session(session)
             self.update_active_sessions()
             self.update_free_slots()
+            self.update_upf_status()
             message = (f"Time: {np.ceil(self.current_time)}, PDU Session {session.session_id} "
                        f"terminated on UPF {upf.upf_id}")
             self._log(message)
@@ -270,8 +292,7 @@ class Scheduler:
                                    f"migrated from UPF {upf.upf_id} to UPF {target_upf.upf_id}")
                         self._log(message)
 
-                if (len(upf.sessions) == 0 and self.free_slots >= self.scale_in_threshold and
-                        self.num_upf_instances > self.min_upf_instances):
+                if self.free_slots == self.scale_in_threshold and self.num_upf_instances >= self.min_upf_instances + 1:
                     self.scale_in(upf)
 
             elif self.migration_case == 4:
@@ -313,8 +334,7 @@ class Scheduler:
                         self._log(message)
                     migrated_upfs.add(upf)
 
-                if (len(upf.sessions) == 0 and self.free_slots >= self.scale_in_threshold and
-                        self.num_upf_instances > self.min_upf_instances):
+                if self.free_slots == self.scale_in_threshold and self.num_upf_instances >= self.min_upf_instances + 1:
                     self.scale_in(upf)
 
             elif self.migration_case == 6:
@@ -346,15 +366,15 @@ class Scheduler:
         """
         Scale out by launching a new UPF instance.
         """
-        if self.num_upf_instances < self.max_upf_instances:
-            new_upf_id = self.next_upf_id
-            self.next_upf_id += 1
-            new_upf = UPF(new_upf_id)
-            self.upfs.append(new_upf)
-            self.num_upf_instances += 1
-            self.update_free_slots()
-            message = f"Time: {np.ceil(self.current_time)}, Compute Node launches UPF {new_upf_id}"
-            self._log(message)
+        new_upf_id = self.next_upf_id
+        self.next_upf_id += 1
+        new_upf = UPF(new_upf_id)
+        self.upfs.append(new_upf)
+        self.num_upf_instances += 1
+        self.update_free_slots()
+        self.update_upf_status()
+        message = f"Time: {np.ceil(self.current_time)}, Compute Node launches UPF {new_upf_id}"
+        self._log(message)
 
     def scale_in(self, upf):
         """
@@ -362,12 +382,12 @@ class Scheduler:
 
         :param upf: UPF instance to be terminated.
         """
-        if upf.upf_id >= self.min_upf_instances:
-            self.upfs.remove(upf)
-            self.num_upf_instances -= 1
-            self.update_free_slots()
-            message = f"Time: {np.ceil(self.current_time)}, Compute Node terminates UPF {upf.upf_id}"
-            self._log(message)
+        self.upfs.remove(upf)
+        self.num_upf_instances -= 1
+        self.update_free_slots()
+        self.update_upf_status()
+        message = f"Time: {np.ceil(self.current_time)}, Compute Node terminates UPF {upf.upf_id}"
+        self._log(message)
 
     def run(self):
         """
@@ -380,10 +400,11 @@ class Scheduler:
         pdu_counts = []  # List to store PDU counts
         upf_counts = []  # List to store UPF counts
         active_pdu_counts = []  # List to store active PDU counts
-        active_upf_counts = []  # List to store active UPF counts
-        free_slots = []
-        rejected_sessions = []
+        free_slots = []  # List to store free slots
+        rejected_sessions = []  # List to store rejected sessions
         time_points = []  # List to store time points
+        busy_upf_counts = []  # List to store busy UPF counts
+        idle_upf_counts = []  # List to store idle UPF counts
 
         pdu_file = open(f'Data/pdus_{self.run_id}.csv', 'w', newline='')
         pdu_writer = csv.writer(pdu_file)
@@ -397,10 +418,6 @@ class Scheduler:
         active_pdu_writer = csv.writer(active_pdu_file)
         active_pdu_writer.writerow(['Time', 'Active PDUs'])
 
-        active_upf_file = open(f'Data/active_upfs_{self.run_id}.csv', 'w', newline='')
-        active_upf_writer = csv.writer(active_upf_file)
-        active_upf_writer.writerow(['Time', 'Active UPFs'])
-
         free_slots_file = open(f'Data/free_slots_{self.run_id}.csv', 'w', newline='')
         free_slots_writer = csv.writer(free_slots_file)
         free_slots_writer.writerow(['Time', 'Free Slots'])
@@ -408,6 +425,14 @@ class Scheduler:
         rejected_sessions_file = open(f'Data/rejected_sessions_{self.run_id}.csv', 'w', newline='')
         rejected_sessions_writer = csv.writer(rejected_sessions_file)
         rejected_sessions_writer.writerow(['Time', 'Rejected Sessions'])
+
+        busy_upf_file = open(f'Data/busy_upfs_{self.run_id}.csv', 'w', newline='')
+        busy_upf_writer = csv.writer(busy_upf_file)
+        busy_upf_writer.writerow(['Time', 'Busy UPFs'])
+
+        idle_upf_file = open(f'Data/idle_upfs_{self.run_id}.csv', 'w', newline='')
+        idle_upf_writer = csv.writer(idle_upf_file)
+        idle_upf_writer.writerow(['Time', 'Idle UPFs'])
 
         # Schedule the initial PDU session generation
         generation_event = Event(EVENT_GENERATE_PDU_SESSION, 0)
@@ -420,17 +445,19 @@ class Scheduler:
             pdu_counts.append(self.session_counter)  # Record PDU count
             upf_counts.append(self.next_upf_id)  # Record UPF count
             active_pdu_counts.append(self.active_sessions)  # Record active PDU count
-            active_upf_counts.append(self.num_upf_instances)  # Record active UPF count
             time_points.append(np.ceil(self.current_time))  # Record time
-            free_slots.append(self.free_slots)
-            rejected_sessions.append(self.rejected_sessions)
+            free_slots.append(self.free_slots)  # Record free slots
+            rejected_sessions.append(self.rejected_sessions)  # Record rejected sessions
+            busy_upf_counts.append(self.busy_upfs)  # Record busy UPF count
+            idle_upf_counts.append(self.idle_upfs)  # Record idle UPF count
 
             pdu_writer.writerow([np.ceil(self.current_time), self.session_counter])
             upf_writer.writerow([np.ceil(self.current_time), self.next_upf_id])
             active_pdu_writer.writerow([np.ceil(self.current_time), self.active_sessions])
-            active_upf_writer.writerow([np.ceil(self.current_time), self.num_upf_instances])
             free_slots_writer.writerow([np.ceil(self.current_time), self.free_slots])
             rejected_sessions_writer.writerow([np.ceil(self.current_time), self.rejected_sessions])
+            busy_upf_writer.writerow([np.ceil(self.current_time), self.busy_upfs])
+            idle_upf_writer.writerow([np.ceil(self.current_time), self.idle_upfs])
 
             if event.event_type == EVENT_GENERATE_PDU_SESSION:
                 self.generate_pdu_session()
@@ -457,9 +484,10 @@ class Scheduler:
         pdu_file.close()
         upf_file.close()
         active_pdu_file.close()
-        active_upf_file.close()
         free_slots_file.close()
         rejected_sessions_file.close()
+        busy_upf_file.close()
+        idle_upf_file.close()
 
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
                   f"Total UPFs deployed: {self.next_upf_id}."
@@ -468,19 +496,19 @@ class Scheduler:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Event-based scheduler simulation")
-    parser.add_argument("--run_id", type=int, default=1, help="ID of simulation run")
-    parser.add_argument("--upf_case", type=int, default=2, help="Case for UPF sorting")
-    parser.add_argument("--max-upf-instances", type=int, default=100, help="Maximum number of UPF instances (L)")
-    parser.add_argument("--min-upf-instances", type=int, default=1, help="Minimum number of UPF instances (M)")
-    parser.add_argument("--max-sessions-per-upf", type=int, default=8, help="Maximum number of sessions per UPF (C)")
-    parser.add_argument("--scale-out-threshold", type=int, default=13, help="Scale-out threshold (T1)")
-    parser.add_argument("--scale-in-threshold", type=int, default=23, help="Scale-in threshold (T2)")
-    parser.add_argument("--simulation-time", type=int, default=100000, help="Simulation time in milliseconds")
-    parser.add_argument("--arrival_rate", type=float, default=150, help="Inter-arrival rate in seconds (λ)")
-    parser.add_argument("--mu", type=float, default=0.0167, help="parameter for session duration in seconds (µ)")
-    parser.add_argument("--migration_case", type=int, default=1, help="Case for session migration")
-    parser.add_argument("--output-file", type=str, default="simulation.log", help="File to write simulation outputs")
-    parser.add_argument("--seed", type=int, default=None, help="Seed for random number generation")
+    parser.add_argument("--run_id", type=int, help="ID of simulation run")
+    parser.add_argument("--upf_case", type=int, help="Case for UPF sorting")
+    parser.add_argument("--max-upf-instances", type=int, help="Maximum number of UPF instances (L)")
+    parser.add_argument("--min-upf-instances", type=int, help="Minimum number of UPF instances (M)")
+    parser.add_argument("--max-sessions-per-upf", type=int, help="Maximum number of sessions per UPF (C)")
+    parser.add_argument("--scale-out-threshold", type=int, help="Scale-out threshold (T1)")
+    parser.add_argument("--scale-in-threshold", type=int, help="Scale-in threshold (T2)")
+    parser.add_argument("--simulation-time", type=int, help="Simulation time in milliseconds")
+    parser.add_argument("--arrival_rate", type=float, help="Inter-arrival rate in seconds (λ)")
+    parser.add_argument("--mu", type=float, help="parameter for session duration in seconds (µ)")
+    parser.add_argument("--migration_case", type=int, help="Case for session migration")
+    parser.add_argument("--output-file", type=str, help="File to write simulation outputs")
+    parser.add_argument("--seed", type=int, help="Seed for random number generation")
 
     args = parser.parse_args()
 

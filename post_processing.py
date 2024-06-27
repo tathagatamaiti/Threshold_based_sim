@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import argparse
+import numpy as np
 import pandas as pd
 
 
@@ -97,68 +98,72 @@ def process_results(input_files):
     idle_upfs['Duration'] = idle_upfs['Time'].diff().shift(-1)
     free_slots['Duration'] = free_slots['Time'].diff().shift(-1)
 
-    # Group and sum the durations
-    duration_by_pdu = active_pdus.groupby('Active PDUs')['Duration'].sum()
-    duration_by_busy_upf = busy_upfs.groupby('Busy UPFs')['Duration'].sum()
-    duration_by_idle_upf = idle_upfs.groupby('Idle UPFs')['Duration'].sum()
-    duration_by_free_slots = free_slots.groupby('Free Slots')['Duration'].sum()
+    # Drop the last row
+    active_pdus = active_pdus.dropna()
+    busy_upfs = busy_upfs.dropna()
+    idle_upfs = idle_upfs.dropna()
+    free_slots = free_slots.dropna()
 
-    # Normalize by the total time to get the PDF
-    total_time = duration_by_pdu.sum()
-    pdf_by_pdu = duration_by_pdu / total_time
+    # Calculate the weights
+    weights_active_pdus = active_pdus['Duration'].values
+    weights_busy_upfs = busy_upfs['Duration'].values
+    weights_idle_upfs = idle_upfs['Duration'].values
+    weights_free_slots = free_slots['Duration'].values
 
-    total_time = duration_by_busy_upf.sum()
-    pdf_by_busy_upf = duration_by_busy_upf / total_time
+    # Number of bins
+    num_bins = 20
 
-    total_time = duration_by_idle_upf.sum()
-    pdf_by_idle_upf = duration_by_idle_upf / total_time
+    # Calculate the histograms
+    pdf_active_pdus, bins_active_pdus = np.histogram(active_pdus['Active PDUs'], bins=num_bins,
+                                                     weights=weights_active_pdus, density=True)
+    pdf_busy_upfs, bins_busy_upfs = np.histogram(busy_upfs['Busy UPFs'], bins=num_bins, weights=weights_busy_upfs,
+                                                 density=True)
+    pdf_idle_upfs, bins_idle_upfs = np.histogram(idle_upfs['Idle UPFs'], bins=num_bins, weights=weights_idle_upfs,
+                                                 density=True)
+    pdf_free_slots, bins_free_slots = np.histogram(free_slots['Free Slots'], bins=num_bins, weights=weights_free_slots,
+                                                   density=True)
 
-    total_time = duration_by_free_slots.sum()
-    pdf_by_free_slots = duration_by_free_slots / total_time
-
-    # Convert to a DataFrame for better readability
-    pdf_pdu = pdf_by_pdu.reset_index().rename(columns={'Duration': 'PDF'})
-    pdf_busy_upf = pdf_by_busy_upf.reset_index().rename(columns={'Duration': 'PDF'})
-    pdf_idle_upf = pdf_by_idle_upf.reset_index().rename(columns={'Duration': 'PDF'})
-    pdf_free_slots = pdf_by_free_slots.reset_index().rename(columns={'Duration': 'PDF'})
-
-    # Plot the PDF of active PDUs
+    # Plot PDF of Active PDUs
     plt.figure(figsize=(20, 10))
-    plt.bar(pdf_pdu['Active PDUs'], pdf_pdu['PDF'], edgecolor='k', alpha=0.7)
+    plt.hist(active_pdus['Active PDUs'], bins=bins_active_pdus, weights=weights_active_pdus, density=True, alpha=0.75,
+             edgecolor='black')
+    plt.title('PDF Weighted by Duration of Active PDUs')
     plt.xlabel('Active PDUs')
-    plt.ylabel('PDF')
-    plt.title('Probability Density Function of Active PDUs')
-    plt.xticks(pdf_pdu['Active PDUs'])
+    plt.ylabel('Probability Density')
+    plt.grid(True)
     plt.savefig('../Results/active_pdus_pdf.png')
     plt.show()
 
-    # Plot the PDF of busy UPFs
+    # Plot PDF of Busy UPFs
     plt.figure(figsize=(20, 10))
-    plt.bar(pdf_busy_upf['Busy UPFs'], pdf_busy_upf['PDF'], edgecolor='k', alpha=0.7)
+    plt.hist(busy_upfs['Busy UPFs'], bins=bins_busy_upfs, weights=weights_busy_upfs, density=True, alpha=0.75,
+             edgecolor='black')
+    plt.title('PDF Weighted by Duration of Busy UPFs')
     plt.xlabel('Busy UPFs')
-    plt.ylabel('PDF')
-    plt.title('Probability Density Function of Busy UPFs')
-    plt.xticks(pdf_busy_upf['Busy UPFs'])
+    plt.ylabel('Probability Density')
+    plt.grid(True)
     plt.savefig('../Results/busy_upfs_pdf.png')
     plt.show()
 
-    # Plot the PDF of idle UPFs
+    # Plot PDF of Idle UPFs
     plt.figure(figsize=(20, 10))
-    plt.bar(pdf_idle_upf['Idle UPFs'], pdf_idle_upf['PDF'], edgecolor='k', alpha=0.7)
+    plt.hist(idle_upfs['Idle UPFs'], bins=bins_idle_upfs, weights=weights_idle_upfs, density=True, alpha=0.75,
+             edgecolor='black')
+    plt.title('PDF Weighted by Duration of Idle UPFs')
     plt.xlabel('Idle UPFs')
-    plt.ylabel('PDF')
-    plt.title('Probability Density Function of Busy UPFs')
-    plt.xticks(pdf_idle_upf['Idle UPFs'])
+    plt.ylabel('Probability Density')
+    plt.grid(True)
     plt.savefig('../Results/idle_upfs_pdf.png')
     plt.show()
 
-    # Plot the PDF of Free Slots
+    # Plot PDF of Free Slots
     plt.figure(figsize=(20, 10))
-    plt.bar(pdf_free_slots['Free Slots'], pdf_free_slots['PDF'], edgecolor='k', alpha=0.7)
+    plt.hist(free_slots['Free Slots'], bins=bins_free_slots, weights=weights_free_slots, density=True, alpha=0.75,
+             edgecolor='black')
+    plt.title('PDF Weighted by Duration of Free Slots')
     plt.xlabel('Free Slots')
-    plt.ylabel('PDF')
-    plt.title('Probability Density Function of Free Slots')
-    plt.xticks(pdf_free_slots['Free Slots'])
+    plt.ylabel('Probability Density')
+    plt.grid(True)
     plt.savefig('../Results/free_slots_pdf.png')
     plt.show()
 

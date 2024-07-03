@@ -1,5 +1,6 @@
 import csv
 import heapq
+import os
 import random
 import argparse
 import numpy as np
@@ -259,6 +260,15 @@ class Scheduler:
                        f"started on UPF {available_upf.upf_id}")
             self._log(message)
 
+            file_path = f'Data/session_durations_{self.run_id}.csv'
+            file_exists = os.path.isfile(file_path)
+            file_empty = os.path.getsize(file_path) == 0 if file_exists else True
+            with open(file_path, 'a', newline='') as duration_file:
+                duration_writer = csv.writer(duration_file)
+                if file_empty:
+                    duration_writer.writerow(['Session ID', 'Duration (seconds)'])
+                duration_writer.writerow([session_id, np.ceil(duration / 1000)])
+
     def terminate_pdu_session(self, session):
         upf = next((upf for upf in self.upfs if session in upf.sessions), None)
         if upf:
@@ -447,7 +457,8 @@ class Scheduler:
             active_pdu_counts.append(self.active_sessions)  # Record active PDU count
             time_points.append(np.ceil(self.current_time))  # Record time
             free_slots.append(self.free_slots)  # Record free slots
-            rejected_sessions.append(self.rejected_sessions)  # Record rejected sessions
+            if self.rejected_sessions > 0:
+                rejected_sessions.append(self.rejected_sessions)  # Record rejected sessions
             busy_upf_counts.append(self.busy_upfs)  # Record busy UPF count
             idle_upf_counts.append(self.idle_upfs)  # Record idle UPF count
 
@@ -455,7 +466,8 @@ class Scheduler:
             upf_writer.writerow([np.ceil(self.current_time), self.next_upf_id])
             active_pdu_writer.writerow([np.ceil(self.current_time), self.active_sessions])
             free_slots_writer.writerow([np.ceil(self.current_time), self.free_slots])
-            rejected_sessions_writer.writerow([np.ceil(self.current_time), self.rejected_sessions])
+            if self.rejected_sessions > 0:
+                rejected_sessions_writer.writerow([np.ceil(self.current_time), self.rejected_sessions])
             busy_upf_writer.writerow([np.ceil(self.current_time), self.busy_upfs])
             idle_upf_writer.writerow([np.ceil(self.current_time), self.idle_upfs])
 

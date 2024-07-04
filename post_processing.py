@@ -94,81 +94,68 @@ def process_results(input_files):
     plt.savefig('../Results/rejected_sessions_vs_simulation_time.png')
     plt.show()
 
-    # Calculate the duration for each interval where the number remains constant
-    active_pdus['Duration'] = active_pdus['Time'].diff().shift(-1)
-    busy_upfs['Duration'] = busy_upfs['Time'].diff().shift(-1)
-    idle_upfs['Duration'] = idle_upfs['Time'].diff().shift(-1)
-    free_slots['Duration'] = free_slots['Time'].diff().shift(-1)
-
-    # Drop the last row
-    active_pdus = active_pdus.dropna()
-    busy_upfs = busy_upfs.dropna()
-    idle_upfs = idle_upfs.dropna()
-    free_slots = free_slots.dropna()
-
-    # Calculate the weights
-    weights_active_pdus = active_pdus['Duration'].values
-    weights_busy_upfs = busy_upfs['Duration'].values
-    weights_idle_upfs = idle_upfs['Duration'].values
-    weights_free_slots = free_slots['Duration'].values
-
-    # Number of bins
-    num_bins = 20
-
-    # Calculate the histograms
-    pdf_active_pdus, bins_active_pdus = np.histogram(active_pdus['Active PDUs'], bins=num_bins,
-                                                     weights=weights_active_pdus, density=True)
-    pdf_busy_upfs, bins_busy_upfs = np.histogram(busy_upfs['Busy UPFs'], bins=50, weights=weights_busy_upfs,
-                                                 density=True)
-    pdf_idle_upfs, bins_idle_upfs = np.histogram(idle_upfs['Idle UPFs'], bins=50, weights=weights_idle_upfs,
-                                                 density=True)
-    pdf_free_slots, bins_free_slots = np.histogram(free_slots['Free Slots'], bins=50, weights=weights_free_slots,
-                                                   density=True)
-
     # Plot PDF of Active PDUs
+    active_pdus['Duration'] = active_pdus['Time'].diff().fillna(0)
+    weighted_active_pdus, bins_active_pdus = np.histogram(active_pdus['Active PDUs'],
+                                                          bins=range(int(active_pdus['Active PDUs'].max()) + 2),
+                                                          weights=active_pdus['Duration'], density=True)
+    total_weight_active_pdus = sum(weighted_active_pdus)
+    pdf_active_pdus = weighted_active_pdus / total_weight_active_pdus
     plt.figure(figsize=(20, 10))
-    plt.hist(active_pdus['Active PDUs'], bins=bins_active_pdus, weights=weights_active_pdus, density=True, alpha=0.75,
-             edgecolor='black')
-    plt.title('PDF Weighted by Duration of Active PDUs')
+    plt.bar(bins_active_pdus[:-1], pdf_active_pdus, width=1, edgecolor='black', alpha=0.7, align='edge')
     plt.xlabel('Active PDUs')
-    plt.ylabel('Probability Density')
+    plt.ylabel('Probability')
+    plt.title('PDF Weighted by Duration of Active PDUs')
     plt.grid(True)
     plt.savefig('../Results/active_pdus_pdf.png')
     plt.show()
 
     # Plot PDF of Busy UPFs
+    busy_upfs['Duration'] = busy_upfs['Time'].diff().fillna(0)
+    weighted_busy_upfs, bins_busy_upfs = np.histogram(busy_upfs['Busy UPFs'], weights=busy_upfs['Duration'],
+                                                      bins=range(int(busy_upfs['Busy UPFs'].max()) + 2))
+    total_weight_busy_upfs = sum(weighted_busy_upfs)
+    pdf_busy_upfs = weighted_busy_upfs / total_weight_busy_upfs
     plt.figure(figsize=(20, 10))
-    plt.hist(busy_upfs['Busy UPFs'], bins=bins_busy_upfs, weights=weights_busy_upfs, density=True, alpha=0.75,
-             edgecolor='black')
-    plt.title('PDF Weighted by Duration of Busy UPFs')
+    plt.bar(bins_busy_upfs[:-1], pdf_busy_upfs, width=1, edgecolor='black', alpha=0.7, align='edge')
     plt.xlabel('Busy UPFs')
-    plt.ylabel('Probability Density')
+    plt.ylabel('Probability')
+    plt.title('Probability Distribution Function of Busy UPFs')
     plt.grid(True)
     plt.savefig('../Results/busy_upfs_pdf.png')
     plt.show()
 
     # Plot PDF of Idle UPFs
+    idle_upfs['Duration'] = idle_upfs['Time'].diff().fillna(0)
+    weighted_idle_upfs, bins_idle_upfs = np.histogram(idle_upfs['Idle UPFs'], weights=idle_upfs['Duration'],
+                                                      bins=range(int(idle_upfs['Idle UPFs'].max()) + 2))
+    total_weight_idle_upfs = sum(weighted_idle_upfs)
+    pdf_idle_upfs = weighted_idle_upfs / total_weight_idle_upfs
     plt.figure(figsize=(20, 10))
-    plt.hist(idle_upfs['Idle UPFs'], bins=bins_idle_upfs, weights=weights_idle_upfs, density=True, alpha=0.75,
-             edgecolor='black')
-    plt.title('PDF Weighted by Duration of Idle UPFs')
+    plt.bar(bins_idle_upfs[:-1], pdf_idle_upfs, width=1, edgecolor='black', alpha=0.7, align='edge')
     plt.xlabel('Idle UPFs')
-    plt.ylabel('Probability Density')
+    plt.ylabel('Probability')
+    plt.title('Probability Distribution Function of Idle UPFs')
     plt.grid(True)
     plt.savefig('../Results/idle_upfs_pdf.png')
     plt.show()
 
     # Plot PDF of Free Slots
+    free_slots['Duration'] = free_slots['Time'].diff().fillna(0)
+    weighted_free_slots, bins_free_slots = np.histogram(free_slots['Free Slots'], weights=free_slots['Duration'],
+                                                        bins=range(int(free_slots['Free Slots'].max()) + 2))
+    total_weight_free_slots = sum(weighted_free_slots)
+    pdf_free_slots = weighted_free_slots / total_weight_free_slots
     plt.figure(figsize=(20, 10))
-    plt.hist(free_slots['Free Slots'], bins=bins_free_slots, weights=weights_free_slots, density=True, alpha=0.75,
-             edgecolor='black')
-    plt.title('PDF Weighted by Duration of Free Slots')
+    plt.bar(bins_free_slots[:-1], pdf_free_slots, width=1, edgecolor='black', alpha=0.7, align='edge')
     plt.xlabel('Free Slots')
-    plt.ylabel('Probability Density')
+    plt.ylabel('Probability')
+    plt.title('Probability Distribution Function of Free Slots')
     plt.grid(True)
     plt.savefig('../Results/free_slots_pdf.png')
     plt.show()
 
+    # Plot Poisson distributions
     durations_empirical = session_durations['Duration (seconds)']
     mean_empirical = durations_empirical.mean()
     poisson_empirical = stats.poisson(mu=mean_empirical)
@@ -201,7 +188,7 @@ def process_results(input_files):
     x_values_inter_arrival = np.arange(0, inter_arrival_times_empirical.max() + 1)
     pmf_empirical_values_inter_arrival = poisson_empirical_inter_arrival.pmf(x_values_inter_arrival)
 
-    lambda_exponential_inter_arrival = 1 / 26
+    lambda_exponential_inter_arrival = 1/26
     mean_theoretical_inter_arrival = 1 / lambda_exponential_inter_arrival
     poisson_theoretical_inter_arrival = stats.poisson(mu=mean_theoretical_inter_arrival)
     pmf_theoretical_values_inter_arrival = poisson_theoretical_inter_arrival.pmf(x_values_inter_arrival)

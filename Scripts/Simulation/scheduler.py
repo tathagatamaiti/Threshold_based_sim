@@ -1,96 +1,14 @@
-import csv
 import heapq
+import csv
 import os
 import random
-import argparse
 import numpy as np
+from event import Event
+from pdu_session import PDUSession
+from upf import UPF
 
-# Event types
 EVENT_GENERATE_PDU_SESSION = 1
 EVENT_TERMINATE_PDU_SESSION = 2
-
-
-class Event:
-    """
-    Represents an event in the simulation.
-    """
-
-    def __init__(self, event_type, time):
-        """
-        Initialize an event with its type and time.
-
-        :param event_type: Type of the event.
-        :param time: Time at which the event occurs.
-        """
-        self.event_type = event_type
-        self.time = time
-
-    def __lt__(self, other):
-        """
-        Less than comparison for events based on time.
-
-        :param other: Another event object.
-        :return: True if this event occurs earlier than the other event.
-        """
-        return self.time < other.time
-
-
-class PDUSession:
-    """
-    Represents a PDU session in the simulation.
-    """
-
-    def __init__(self, session_id, start_time, duration):
-        """
-        Initialize a PDU session with its ID, start time, and duration.
-
-        :param session_id: ID of the session.
-        :param start_time: Start time of the session.
-        :param duration: Duration of the session.
-        """
-        self.session_id = session_id
-        self.start_time = start_time
-        self.duration = duration
-        self.end_time = start_time + duration
-
-
-class UPF:
-    """
-    Represents a UPF (User Plane Function) in the simulation.
-    """
-
-    def __init__(self, upf_id):
-        """
-        Initialize a UPF with its ID.
-
-        :param upf_id: ID of the UPF.
-        """
-        self.upf_id = upf_id
-        self.sessions = []
-
-    def add_session(self, session):
-        """
-        Add a session to the UPF.
-
-        :param session: Session object to be added.
-        """
-        self.sessions.append(session)
-
-    def remove_session(self, session):
-        """
-        Remove a session from the UPF.
-
-        :param session: Session object to be removed.
-        """
-        self.sessions.remove(session)
-
-    def is_busy(self):
-        """
-        Check if the UPF has any active sessions.
-
-        :return: True if the UPF has active sessions, False otherwise.
-        """
-        return len(self.sessions) > 0
 
 
 class Scheduler:
@@ -240,7 +158,7 @@ class Scheduler:
 
         if available_upf:
             if (self.active_sessions == (self.num_upf_instances * self.max_sessions_per_upf) -
-                    self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
+                self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
                 self.scale_out()
 
             message = f"Time: {np.ceil(self.current_time)}, UE sends PDU session {session_id} request to Compute Node"
@@ -260,7 +178,7 @@ class Scheduler:
                        f"started on UPF {available_upf.upf_id}")
             self._log(message)
 
-            file_path = f'Data/session_durations_{self.run_id}.csv'
+            file_path = f'../Data/session_durations_{self.run_id}.csv'
             file_exists = os.path.isfile(file_path)
             file_empty = os.path.getsize(file_path) == 0 if file_exists else True
             with open(file_path, 'a', newline='') as duration_file:
@@ -416,31 +334,31 @@ class Scheduler:
         busy_upf_counts = []  # List to store busy UPF counts
         idle_upf_counts = []  # List to store idle UPF counts
 
-        pdu_file = open(f'Data/pdus_{self.run_id}.csv', 'w', newline='')
+        pdu_file = open(f'../Data/pdus_{self.run_id}.csv', 'w', newline='')
         pdu_writer = csv.writer(pdu_file)
         pdu_writer.writerow(['Time', 'PDUs'])
 
-        upf_file = open(f'Data/upfs_{self.run_id}.csv', 'w', newline='')
+        upf_file = open(f'../Data/upfs_{self.run_id}.csv', 'w', newline='')
         upf_writer = csv.writer(upf_file)
         upf_writer.writerow(['Time', 'UPFs'])
 
-        active_pdu_file = open(f'Data/active_pdus_{self.run_id}.csv', 'w', newline='')
+        active_pdu_file = open(f'../Data/active_pdus_{self.run_id}.csv', 'w', newline='')
         active_pdu_writer = csv.writer(active_pdu_file)
         active_pdu_writer.writerow(['Time', 'Active PDUs'])
 
-        free_slots_file = open(f'Data/free_slots_{self.run_id}.csv', 'w', newline='')
+        free_slots_file = open(f'../Data/free_slots_{self.run_id}.csv', 'w', newline='')
         free_slots_writer = csv.writer(free_slots_file)
         free_slots_writer.writerow(['Time', 'Free Slots'])
 
-        rejected_sessions_file = open(f'Data/rejected_sessions_{self.run_id}.csv', 'w', newline='')
+        rejected_sessions_file = open(f'../Data/rejected_sessions_{self.run_id}.csv', 'w', newline='')
         rejected_sessions_writer = csv.writer(rejected_sessions_file)
         rejected_sessions_writer.writerow(['Time', 'Rejected Sessions'])
 
-        busy_upf_file = open(f'Data/busy_upfs_{self.run_id}.csv', 'w', newline='')
+        busy_upf_file = open(f'../Data/busy_upfs_{self.run_id}.csv', 'w', newline='')
         busy_upf_writer = csv.writer(busy_upf_file)
         busy_upf_writer.writerow(['Time', 'Busy UPFs'])
 
-        idle_upf_file = open(f'Data/idle_upfs_{self.run_id}.csv', 'w', newline='')
+        idle_upf_file = open(f'../Data/idle_upfs_{self.run_id}.csv', 'w', newline='')
         idle_upf_writer = csv.writer(idle_upf_file)
         idle_upf_writer.writerow(['Time', 'Idle UPFs'])
 
@@ -504,28 +422,3 @@ class Scheduler:
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
                   f"Total UPFs deployed: {self.next_upf_id}."
                   f"Rejected sessions: {self.rejected_sessions}.")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Event-based scheduler simulation")
-    parser.add_argument("--run_id", type=int, help="ID of simulation run")
-    parser.add_argument("--upf_case", type=int, help="Case for UPF sorting")
-    parser.add_argument("--max-upf-instances", type=int, help="Maximum number of UPF instances (L)")
-    parser.add_argument("--min-upf-instances", type=int, help="Minimum number of UPF instances (M)")
-    parser.add_argument("--max-sessions-per-upf", type=int, help="Maximum number of sessions per UPF (C)")
-    parser.add_argument("--scale-out-threshold", type=int, help="Scale-out threshold (T1)")
-    parser.add_argument("--scale-in-threshold", type=int, help="Scale-in threshold (T2)")
-    parser.add_argument("--simulation-time", type=int, help="Simulation time in milliseconds")
-    parser.add_argument("--arrival_rate", type=float, help="Inter-arrival rate in seconds (λ)")
-    parser.add_argument("--mu", type=float, help="parameter for session duration in seconds (µ)")
-    parser.add_argument("--migration_case", type=int, help="Case for session migration")
-    parser.add_argument("--output-file", type=str, help="File to write simulation outputs")
-    parser.add_argument("--seed", type=int, help="Seed for random number generation")
-
-    args = parser.parse_args()
-
-    scheduler = Scheduler(args.run_id, args.upf_case, args.max_upf_instances, args.min_upf_instances,
-                          args.max_sessions_per_upf, args.scale_out_threshold, args.scale_in_threshold,
-                          args.simulation_time, args.arrival_rate, args.mu, args.migration_case, args.output_file,
-                          args.seed)
-    scheduler.run()

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # shellcheck disable=SC2164
-cd Data
+cd ../Data
 echo "Available CSV files:"
 ls
 
@@ -16,4 +16,4 @@ if [ ${#INPUT_FILES[@]} -ne 8 ]; then
 fi
 
 # shellcheck disable=SC2068
-python3 ../post_processing.py --input-files ${INPUT_FILES[@]}
+python3 ../Scripts/Post_Processing/main_post_processing.py --input-files ${INPUT_FILES[@]}

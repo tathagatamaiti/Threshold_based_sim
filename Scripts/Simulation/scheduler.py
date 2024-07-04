@@ -158,7 +158,7 @@ class Scheduler:
 
         if available_upf:
             if (self.active_sessions == (self.num_upf_instances * self.max_sessions_per_upf) -
-                self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
+                    self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
                 self.scale_out()
 
             message = f"Time: {np.ceil(self.current_time)}, UE sends PDU session {session_id} request to Compute Node"

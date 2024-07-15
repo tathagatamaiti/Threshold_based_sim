@@ -56,7 +56,7 @@ class Scheduler:
         self.simulation_time = simulation_time
         self.active_sessions = 0  # I: number of sessions being served
         self.free_slots = 0  # U: number of free slots in the system
-        self.rejected_sessions = 0
+        self.rejected_sessions = []  # List to store rejected sessions and their times
         self.busy_upfs = 0  # Number of UPFs with active PDU sessions
         self.idle_upfs = 0  # Number of UPFs without active PDU sessions
         self.output_file = output_file
@@ -82,7 +82,7 @@ class Scheduler:
 
     def update_active_sessions(self):
         """
-        Update the number of free slots in the system.
+        Update the number of active sessions in the system.
         """
         self.active_sessions = sum(len(upf.sessions) for upf in self.upfs)
 
@@ -108,8 +108,8 @@ class Scheduler:
 
     def get_upf_with_highest_sessions(self):
         """
-        Get the UPF with the lowest number of sessions, while respecting the max_sessions_per_upf limit.
-        If multiple UPFs have the same lowest number of sessions, randomly select one.
+        Get the UPF with the highest number of sessions, while respecting the max_sessions_per_upf limit.
+        If multiple UPFs have the same highest number of sessions, randomly select one.
         """
         upfs_under_limit = [upf for upf in self.upfs if len(upf.sessions) < self.max_sessions_per_upf]
         if not upfs_under_limit:
@@ -148,13 +148,13 @@ class Scheduler:
                 self.scale_out()
                 available_upf = self.upfs[-1]
             else:
-                self.rejected_sessions += 1
+                self.rejected_sessions.append((session_id, np.ceil(self.current_time)))
                 message = f"Time: {np.ceil(self.current_time)}, Cannot scale out due to maximum UPF instances reached"
                 self._log(message)
                 message = (f"Time: {np.ceil(self.current_time)}, Cannot assign PDU session to UPF because of resource "
                            f"constraints, terminating PDU session")
                 self._log(message)
-                self.terminate_pdu_session(session)
+                return
 
         if available_upf:
             if (self.active_sessions == (self.num_upf_instances * self.max_sessions_per_upf) -
@@ -329,10 +329,10 @@ class Scheduler:
         upf_counts = []  # List to store UPF counts
         active_pdu_counts = []  # List to store active PDU counts
         free_slots = []  # List to store free slots
-        rejected_sessions = []  # List to store rejected sessions
         time_points = []  # List to store time points
         busy_upf_counts = []  # List to store busy UPF counts
         idle_upf_counts = []  # List to store idle UPF counts
+        inter_arrival_times = []  # List to store inter-arrival times
 
         pdu_file = open(f'../Data/pdus_{self.run_id}.csv', 'w', newline='')
         pdu_writer = csv.writer(pdu_file)
@@ -352,7 +352,7 @@ class Scheduler:
 
         rejected_sessions_file = open(f'../Data/rejected_sessions_{self.run_id}.csv', 'w', newline='')
         rejected_sessions_writer = csv.writer(rejected_sessions_file)
-        rejected_sessions_writer.writerow(['Time', 'Rejected Sessions'])
+        rejected_sessions_writer.writerow(['Time', 'Session ID'])
 
         busy_upf_file = open(f'../Data/busy_upfs_{self.run_id}.csv', 'w', newline='')
         busy_upf_writer = csv.writer(busy_upf_file)
@@ -362,8 +362,13 @@ class Scheduler:
         idle_upf_writer = csv.writer(idle_upf_file)
         idle_upf_writer.writerow(['Time', 'Idle UPFs'])
 
+        inter_arrival_file = open(f'../Data/inter_arrival_times_{self.run_id}.csv', 'w', newline='')
+        inter_arrival_writer = csv.writer(inter_arrival_file)
+        inter_arrival_writer.writerow(['Inter-arrival Time'])
+
         # Schedule the initial PDU session generation
-        generation_event = Event(EVENT_GENERATE_PDU_SESSION, 0)
+        initial_generation_time = 0
+        generation_event = Event(EVENT_GENERATE_PDU_SESSION, initial_generation_time)
         heapq.heappush(self.event_queue, generation_event)
 
         while self.event_queue and np.ceil(self.current_time) < self.simulation_time:
@@ -375,8 +380,6 @@ class Scheduler:
             active_pdu_counts.append(self.active_sessions)  # Record active PDU count
             time_points.append(np.ceil(self.current_time))  # Record time
             free_slots.append(self.free_slots)  # Record free slots
-            if self.rejected_sessions > 0:
-                rejected_sessions.append(self.rejected_sessions)  # Record rejected sessions
             busy_upf_counts.append(self.busy_upfs)  # Record busy UPF count
             idle_upf_counts.append(self.idle_upfs)  # Record idle UPF count
 
@@ -384,8 +387,6 @@ class Scheduler:
             upf_writer.writerow([np.ceil(self.current_time), self.next_upf_id])
             active_pdu_writer.writerow([np.ceil(self.current_time), self.active_sessions])
             free_slots_writer.writerow([np.ceil(self.current_time), self.free_slots])
-            if self.rejected_sessions > 0:
-                rejected_sessions_writer.writerow([np.ceil(self.current_time), self.rejected_sessions])
             busy_upf_writer.writerow([np.ceil(self.current_time), self.busy_upfs])
             idle_upf_writer.writerow([np.ceil(self.current_time), self.idle_upfs])
 
@@ -398,6 +399,10 @@ class Scheduler:
                 if next_generation_time <= self.simulation_time:
                     generation_event = Event(EVENT_GENERATE_PDU_SESSION, next_generation_time)
                     heapq.heappush(self.event_queue, generation_event)
+                    inter_arrival_time = next_generation_time - initial_generation_time
+                    inter_arrival_times.append(inter_arrival_time)
+                    inter_arrival_writer.writerow([inter_arrival_time])
+                    initial_generation_time = next_generation_time
 
             elif event.event_type == EVENT_TERMINATE_PDU_SESSION:
                 session = next(
@@ -405,6 +410,9 @@ class Scheduler:
                     None)
                 if session:
                     self.terminate_pdu_session(session)
+
+        for session_id, rejection_time in self.rejected_sessions:
+            rejected_sessions_writer.writerow([rejection_time, session_id])
 
         # Terminate any remaining UPFs
         for upf in self.upfs:
@@ -418,7 +426,8 @@ class Scheduler:
         rejected_sessions_file.close()
         busy_upf_file.close()
         idle_upf_file.close()
+        inter_arrival_file.close()
 
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
                   f"Total UPFs deployed: {self.next_upf_id}."
-                  f"Rejected sessions: {self.rejected_sessions}.")
+                  f"Rejected sessions: {len(self.rejected_sessions)}.")

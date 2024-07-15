@@ -21,8 +21,8 @@ def process_results(input_files):
     busy_upfs = pd.read_csv(input_files[3])
     idle_upfs = pd.read_csv(input_files[4])
     free_slots = pd.read_csv(input_files[5])
-    rejected_sessions = pd.read_csv(input_files[6])
-    session_durations = pd.read_csv(input_files[7])
+    session_durations = pd.read_csv(input_files[6])
+    inter_arrival_times = pd.read_csv(input_files[7])
 
     # Plot PDU against simulation time
     plt.figure(figsize=(20, 10))
@@ -82,16 +82,6 @@ def process_results(input_files):
     plt.title('Free Slots vs Simulation Time')
     plt.grid(True)
     plt.savefig('../Results/free_slots_vs_simulation_time.png')
-    plt.show()
-
-    # Plot rejected sessions against simulation time
-    plt.figure(figsize=(20, 10))
-    plt.plot(rejected_sessions['Time'], rejected_sessions['Rejected Sessions'], color='black')
-    plt.xlabel('Simulation Time in ms')
-    plt.ylabel('Rejected Sessions')
-    plt.title('Rejected Sessions vs Simulation Time')
-    plt.grid(True)
-    plt.savefig('../Results/rejected_sessions_vs_simulation_time.png')
     plt.show()
 
     # Plot PDF of Active PDUs
@@ -155,57 +145,54 @@ def process_results(input_files):
     plt.savefig('../Results/free_slots_pdf.png')
     plt.show()
 
-    # Plot Poisson distributions
-    durations_empirical = session_durations['Duration (seconds)']
-    mean_empirical = durations_empirical.mean()
-    poisson_empirical = stats.poisson(mu=mean_empirical)
-    x_values = np.arange(0, durations_empirical.max() + 1)
-    pmf_empirical_values = poisson_empirical.pmf(x_values)
+    # Plot distributions
 
-    mu_exponential = 0.02
-    mean_theoretical = 1 / mu_exponential
-    poisson_theoretical = stats.poisson(mu=mean_theoretical)
-    pmf_theoretical_values = poisson_theoretical.pmf(x_values)
+    inter_arrival_times = inter_arrival_times['Inter-arrival Time'].dropna()
 
     plt.figure(figsize=(20, 10))
-    plt.plot(x_values, pmf_empirical_values, 'bo', ms=8, label='Empirical Poisson PMF')
-    plt.vlines(x_values, 0, pmf_empirical_values, colors='b', lw=2)
-
-    plt.plot(x_values, pmf_theoretical_values, 'ro', ms=8, label='Theoretical Poisson PMF')
-    plt.vlines(x_values, 0, pmf_theoretical_values, colors='r', lw=2)
-
-    plt.title('Empirical vs Theoretical Poisson Distribution of Session Durations')
-    plt.xlabel('Duration (seconds)')
-    plt.ylabel('Probability')
-    plt.legend()
+    plt.hist(inter_arrival_times, bins=30, density=True, alpha=0.6, color='g', edgecolor='black')
+    plt.title('Frequency Distribution of Inter-arrival Times')
+    plt.xlabel('Inter-arrival Time')
+    plt.ylabel('Density')
     plt.grid(True)
-    plt.savefig('../Results/poisson_duration.png')
+    plt.savefig('../Results/inter_arrival_times_distribution.png')
     plt.show()
 
-    inter_arrival_times_empirical = pdus['Time'].diff().dropna()
-    mean_empirical_inter_arrival = inter_arrival_times_empirical.mean()
-    poisson_empirical_inter_arrival = stats.poisson(mu=mean_empirical_inter_arrival)
-    x_values_inter_arrival = np.arange(0, inter_arrival_times_empirical.max() + 1)
-    pmf_empirical_values_inter_arrival = poisson_empirical_inter_arrival.pmf(x_values_inter_arrival)
-
-    lambda_exponential_inter_arrival = 1/26
-    mean_theoretical_inter_arrival = 1 / lambda_exponential_inter_arrival
-    poisson_theoretical_inter_arrival = stats.poisson(mu=mean_theoretical_inter_arrival)
-    pmf_theoretical_values_inter_arrival = poisson_theoretical_inter_arrival.pmf(x_values_inter_arrival)
+    loc, scale = stats.expon.fit(inter_arrival_times)
+    pdf_expon = stats.expon.pdf(np.sort(inter_arrival_times), loc, scale)
 
     plt.figure(figsize=(20, 10))
-    plt.plot(x_values_inter_arrival, pmf_empirical_values_inter_arrival, 'bo', ms=8, label='Empirical Poisson PMF')
-    plt.vlines(x_values_inter_arrival, 0, pmf_empirical_values_inter_arrival, colors='b', lw=2)
-
-    plt.plot(x_values_inter_arrival, pmf_theoretical_values_inter_arrival, 'ro', ms=8, label='Theoretical Poisson PMF')
-    plt.vlines(x_values_inter_arrival, 0, pmf_theoretical_values_inter_arrival, colors='r', lw=2)
-
-    plt.title('Empirical vs Theoretical Poisson Distribution of Inter-Arrival Times')
-    plt.xlabel('Inter-Arrival Time (seconds)')
-    plt.ylabel('Probability')
-    plt.legend()
+    plt.hist(inter_arrival_times, bins=30, density=True, alpha=0.6, color='g', edgecolor='black')
+    plt.plot(np.sort(inter_arrival_times), pdf_expon, 'r-', lw=2)
+    plt.title('Frequency Distribution of Inter-arrival Times with Fitted Exponential Distribution')
+    plt.xlabel('Inter-arrival Time')
+    plt.ylabel('Density')
     plt.grid(True)
-    plt.savefig('../Results/poisson_inter_arrival.png')
+    plt.savefig('../Results/inter_arrival_times_distribution_fitted.png')
+    plt.show()
+
+    session_durations = session_durations['Duration (seconds)'].dropna()
+
+    plt.figure(figsize=(20, 10))
+    plt.hist(session_durations, bins=30, density=True, alpha=0.6, color='b', edgecolor='black')
+    plt.title('Frequency Distribution of Session Durations')
+    plt.xlabel('Duration (seconds)')
+    plt.ylabel('Density')
+    plt.grid(True)
+    plt.savefig('../Results/session durations_distribution.png')
+    plt.show()
+
+    loc_sess, scale_sess = stats.expon.fit(session_durations)
+    pdf_expon_sess = stats.expon.pdf(np.sort(session_durations), loc_sess, scale_sess)
+
+    plt.figure(figsize=(20, 10))
+    plt.hist(session_durations, bins=30, density=True, alpha=0.6, color='b', edgecolor='black')
+    plt.plot(np.sort(session_durations), pdf_expon_sess, 'r-', lw=2)
+    plt.title('Frequency Distribution of Session Durations with Fitted Exponential Distribution')
+    plt.xlabel('Duration (seconds)')
+    plt.ylabel('Density')
+    plt.grid(True)
+    plt.savefig('../Results/session_durations_distribution_fitted.png')
     plt.show()
 
 

@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from scipy.stats import poisson
 
 
 def main():
@@ -193,6 +194,26 @@ def process_results(input_files):
     plt.ylabel('Density')
     plt.grid(True)
     plt.savefig('../Results/session_durations_distribution_fitted.png')
+    plt.show()
+
+    pdus['Time_seconds'] = pdus['Time'] / 1000
+    pdus['Time_seconds'] = pdus['Time_seconds'].astype(int)
+    pdus_per_second = pdus.groupby('Time_seconds')['PDUs'].count()
+
+    mean = pdus_per_second.mean()
+    x = np.arange(pdus_per_second.min(), pdus_per_second.max() + 1)
+    poisson_pmf = poisson.pmf(x, mean)
+
+    plt.figure(figsize=(20, 10))
+    plt.hist(pdus_per_second, bins=range(pdus_per_second.min(), pdus_per_second.max() + 2), edgecolor='black',
+             density=True, alpha=0.7, label='PDUs per second')
+    plt.plot(x, poisson_pmf, 'r-', marker='o', label=f'Poisson PMF (mean={mean:.2f})')
+    plt.xlabel('Number of PDUs per second')
+    plt.ylabel('Probability')
+    plt.title('Distribution of PDUs per Second vs Poisson Distribution')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('../Results/pdus_per_second_distribution.png')
     plt.show()
 
 

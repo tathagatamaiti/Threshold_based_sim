@@ -84,3 +84,6 @@ python3 ../Scripts/Simulation/main_sim.py --run_id ${NEW_RUN_ID_11} --upf_case $
 NEW_RUN_ID_12=12
 echo "Running simulation with lambda=${ARRIVAL_RATE_12}"
 python3 ../Scripts/Simulation/main_sim.py --run_id ${NEW_RUN_ID_12} --upf_case ${DEFAULT_UPF_CASE} --max-upf-instances ${DEFAULT_MAX_UPF_INSTANCES} --min-upf-instances ${DEFAULT_MIN_UPF_INSTANCES} --max-sessions-per-upf ${DEFAULT_MAX_SESSIONS_PER_UPF} --scale-out-threshold ${SCALE_OUT_THRESHOLD} --scale-in-threshold ${SCALE_IN_THRESHOLD} --simulation-time ${SIMULATION_TIME} --arrival_rate ${ARRIVAL_RATE_12} --mu ${MU} --migration_case ${MIGRATION_CASE} --output-file ../Logs/${OUTPUT_FILE}_lambda_${ARRIVAL_RATE_12}.log --seed ${SEED}
+
+# Compute average utilization
+python3 ../Scripts/Simulation/mean_utilization.py

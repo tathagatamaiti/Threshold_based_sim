@@ -93,6 +93,35 @@ class Scheduler:
         self.busy_upfs = sum(1 for upf in self.upfs if upf.is_busy())
         self.idle_upfs = self.num_upf_instances - self.busy_upfs
 
+    def calculate_utilization(self):
+        """
+        Calculate the utilization of the system.
+        Utilization U = ∑(i,j)∈S (i / (j * C)) * p_{i,j}
+        where:
+        - i is the number of sessions at that instant
+        - j is the number of UPFs at that instant
+        - C is the capacity of each UPF instance
+        - p_{i,j} is assumed to be 1 as each session contributes fully to utilization
+        """
+        total_utilization = 0
+        for upf in self.upfs:
+            sessions = len(upf.sessions)
+            total_utilization += sessions / (self.num_upf_instances * self.max_sessions_per_upf)
+        return total_utilization
+
+    def log_utilization(self):
+        """
+        Log the current utilization to a CSV file.
+        """
+        utilization = self.calculate_utilization()
+        file_path = f'../Data/utilization_{self.run_id}.csv'
+        file_exists = os.path.isfile(file_path)
+        with open(file_path, 'a', newline='') as util_file:
+            util_writer = csv.writer(util_file)
+            if not file_exists:
+                util_writer.writerow(['Time', 'Utilization'])
+            util_writer.writerow([np.ceil(self.current_time), utilization])
+
     def get_upf_with_lowest_sessions(self):
         """
         Get the UPF with the lowest number of sessions, while respecting the max_sessions_per_upf limit.
@@ -167,6 +196,7 @@ class Scheduler:
             self.update_active_sessions()
             self.update_free_slots()
             self.update_upf_status()
+            self.log_utilization()
             end_event = Event(EVENT_TERMINATE_PDU_SESSION, np.ceil(self.current_time) + duration)
             heapq.heappush(self.event_queue, end_event)
 
@@ -194,6 +224,7 @@ class Scheduler:
             self.update_active_sessions()
             self.update_free_slots()
             self.update_upf_status()
+            self.log_utilization()
             message = (f"Time: {np.ceil(self.current_time)}, PDU Session {session.session_id} "
                        f"terminated on UPF {upf.upf_id}")
             self._log(message)
@@ -301,6 +332,7 @@ class Scheduler:
         self.num_upf_instances += 1
         self.update_free_slots()
         self.update_upf_status()
+        self.log_utilization()
         message = f"Time: {np.ceil(self.current_time)}, Compute Node launches UPF {new_upf_id}"
         self._log(message)
 
@@ -314,6 +346,7 @@ class Scheduler:
         self.num_upf_instances -= 1
         self.update_free_slots()
         self.update_upf_status()
+        self.log_utilization()
         message = f"Time: {np.ceil(self.current_time)}, Compute Node terminates UPF {upf.upf_id}"
         self._log(message)
 
@@ -321,8 +354,7 @@ class Scheduler:
         """
         Run the simulation.
 
-        This method executes the simulation and generates plots for PDU count against simulation time
-        and UPF count against simulation time.
+        This method executes the simulation.
         """
 
         pdu_counts = []  # List to store PDU counts
@@ -333,6 +365,7 @@ class Scheduler:
         busy_upf_counts = []  # List to store busy UPF counts
         idle_upf_counts = []  # List to store idle UPF counts
         inter_arrival_times = []  # List to store inter-arrival times
+        deployed_upf_counts = []
 
         pdu_file = open(f'../Data/pdus_{self.run_id}.csv', 'w', newline='')
         pdu_writer = csv.writer(pdu_file)
@@ -366,6 +399,14 @@ class Scheduler:
         inter_arrival_writer = csv.writer(inter_arrival_file)
         inter_arrival_writer.writerow(['Inter-arrival Time'])
 
+        utilization_file = open(f'../Data/utilization_{self.run_id}.csv', 'w', newline='')
+        utilization_writer = csv.writer(utilization_file)
+        utilization_writer.writerow(['Time', 'Utilization'])
+
+        deployed_upf_file = open(f'../Data/deployed_upfs_{self.run_id}.csv', 'w', newline='')
+        deployed_upf_writer = csv.writer(deployed_upf_file)
+        deployed_upf_writer.writerow(['Time', 'Deployed UPFs'])
+
         # Schedule the initial PDU session generation
         initial_generation_time = 0
         generation_event = Event(EVENT_GENERATE_PDU_SESSION, initial_generation_time)
@@ -382,6 +423,7 @@ class Scheduler:
             free_slots.append(self.free_slots)  # Record free slots
             busy_upf_counts.append(self.busy_upfs)  # Record busy UPF count
             idle_upf_counts.append(self.idle_upfs)  # Record idle UPF count
+            deployed_upf_counts.append(self.num_upf_instances)
 
             pdu_writer.writerow([np.ceil(self.current_time), self.session_counter])
             upf_writer.writerow([np.ceil(self.current_time), self.next_upf_id])
@@ -389,6 +431,7 @@ class Scheduler:
             free_slots_writer.writerow([np.ceil(self.current_time), self.free_slots])
             busy_upf_writer.writerow([np.ceil(self.current_time), self.busy_upfs])
             idle_upf_writer.writerow([np.ceil(self.current_time), self.idle_upfs])
+            deployed_upf_writer.writerow([np.ceil(self.current_time), self.num_upf_instances])
 
             if event.event_type == EVENT_GENERATE_PDU_SESSION:
                 self.generate_pdu_session()
@@ -427,6 +470,8 @@ class Scheduler:
         busy_upf_file.close()
         idle_upf_file.close()
         inter_arrival_file.close()
+        utilization_file.close()
+        deployed_upf_file.close()
 
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
                   f"Total UPFs deployed: {self.next_upf_id}."

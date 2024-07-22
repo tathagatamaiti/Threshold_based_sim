@@ -7,7 +7,7 @@ import scipy.stats as stats
 
 def main():
     parser = argparse.ArgumentParser(description='Post-process simulation results')
-    parser.add_argument('--input-files', type=str, nargs=10, required=True, help='Input CSV files to process')
+    parser.add_argument('--input-files', type=str, nargs=11, required=True, help='Input CSV files to process')
     args = parser.parse_args()
 
     process_results(args.input_files)
@@ -25,6 +25,7 @@ def process_results(input_files):
     session_durations = pd.read_csv(input_files[7])
     inter_arrival_times = pd.read_csv(input_files[8])
     average_utilization = pd.read_csv(input_files[9])
+    session_throughput = pd.read_csv(input_files[10])
 
     # Plot PDU against simulation time
     plt.figure(figsize=(20, 10))
@@ -211,7 +212,7 @@ def process_results(input_files):
     plt.xlabel('Duration (seconds)')
     plt.ylabel('Density')
     plt.grid(True)
-    plt.savefig('../Results/session durations_distribution.png')
+    plt.savefig('../Results/session_durations_distribution.png')
     plt.show()
 
     loc_sess, scale_sess = stats.expon.fit(session_durations)
@@ -227,6 +228,30 @@ def process_results(input_files):
     plt.savefig('../Results/session_durations_distribution_fitted.png')
     plt.show()
 
+    session_throughput = session_throughput['Throughput'].dropna()
+
+    plt.figure(figsize=(20, 10))
+    plt.hist(session_throughput, bins=30, density=True, alpha=0.6, color='b', edgecolor='black')
+    plt.title('Frequency Distribution of Session Throughput')
+    plt.xlabel('Throughput')
+    plt.ylabel('Density')
+    plt.grid(True)
+    plt.savefig('../Results/session_throughput_distribution.png')
+    plt.show()
+
+    loc_sess, scale_sess = stats.expon.fit(session_throughput)
+    pdf_expon_sess = stats.expon.pdf(np.sort(session_throughput), loc_sess, scale_sess)
+
+    plt.figure(figsize=(20, 10))
+    plt.hist(session_throughput, bins=30, density=True, alpha=0.6, color='b', edgecolor='black')
+    plt.plot(np.sort(session_throughput), pdf_expon_sess, 'r-', lw=2)
+    plt.title('Frequency Distribution of Session Throughput with Fitted Exponential Distribution')
+    plt.xlabel('Throughput')
+    plt.ylabel('Density')
+    plt.grid(True)
+    plt.savefig('../Results/session_throughput_distribution_fitted.png')
+    plt.show()
+
     traffic_intensity = [200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300]
     plt.figure(figsize=(20, 10))
     plt.plot(average_utilization['Average Utilization'], marker='o', linestyle='-')
@@ -236,7 +261,7 @@ def process_results(input_files):
     plt.grid(True)
     plt.xticks(range(len(average_utilization)), traffic_intensity[:len(average_utilization)])
     plt.tight_layout()
-    plt.savefig('../Results/average_utilization_traffic_intensity.png')
+    plt.savefig('../Results/average_utilization_traffic_intensity_throughput.png')
     plt.show()
 
 

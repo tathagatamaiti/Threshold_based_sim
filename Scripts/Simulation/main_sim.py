@@ -13,7 +13,8 @@ if __name__ == "__main__":
     parser.add_argument("--simulation-time", type=int, help="Simulation time in milliseconds")
     parser.add_argument("--arrival_rate", type=float, help="Inter-arrival rate in seconds (λ)")
     parser.add_argument("--mu", type=float, help="parameter for session duration in seconds (µ)")
-    parser.add_argument("--migration_case", type=int, help="Case for session migration")
+    parser.add_argument("--scaling_case", type=int, help="Case for scaling")
+    parser.add_argument("--migration_frequency", type=int, help="Frequency for session migration")
     parser.add_argument("--output-file", type=str, help="File to write simulation outputs")
     parser.add_argument("--seed", type=int, help="Seed for random number generation")
 
@@ -21,7 +22,6 @@ if __name__ == "__main__":
 
     scheduler = Scheduler(args.run_id, args.upf_case, args.max_upf_instances, args.min_upf_instances,
                           args.max_sessions_per_upf, args.scale_out_threshold, args.scale_in_threshold,
-                          args.simulation_time, args.arrival_rate, args.mu, args.migration_case, args.output_file,
-                          args.seed)
+                          args.simulation_time, args.arrival_rate, args.mu, args.scaling_case,
+                          args.migration_frequency, args.output_file, args.seed)
     scheduler.run()
-    

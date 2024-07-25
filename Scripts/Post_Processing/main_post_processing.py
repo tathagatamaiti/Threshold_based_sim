@@ -28,6 +28,15 @@ def process_results(input_files):
     acceptance_percentages = pd.read_csv(input_files[10])
     rejection_percentages = pd.read_csv(input_files[11])
 
+    def slice_dataframe(df):
+        return df[int(len(df) * 0.1):]
+
+    active_pdus = slice_dataframe(active_pdus)
+    deployed_upfs = slice_dataframe(deployed_upfs)
+    busy_upfs = slice_dataframe(busy_upfs)
+    idle_upfs = slice_dataframe(idle_upfs)
+    free_slots = slice_dataframe(free_slots)
+
     # Plot PDU against simulation time
     plt.figure(figsize=(20, 10))
     plt.plot(pdus['Time'], pdus['PDUs'], color='blue')

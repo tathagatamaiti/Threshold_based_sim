@@ -287,7 +287,11 @@ class Scheduler:
                     continue
                 while len(upf_with_free_slots.sessions) > 0 and len(
                         upf_with_less_free_slots.sessions) < self.max_sessions_per_upf:
-                    session_to_migrate = upf_with_free_slots.sessions.pop()
+                    session_to_migrate = next((s for s in upf_with_free_slots.sessions if not s.migrated), None)
+                    if session_to_migrate is None:
+                        break
+                    upf_with_free_slots.sessions.remove(session_to_migrate)
+                    session_to_migrate.migrated = True
                     upf_with_less_free_slots.add_session(session_to_migrate)
                     message = (f"Time: {np.ceil(self.current_time)}, PDU Session {session_to_migrate.session_id} "
                                f"migrated from UPF {upf_with_free_slots.upf_id} to UPF {upf_with_less_free_slots.upf_id}")

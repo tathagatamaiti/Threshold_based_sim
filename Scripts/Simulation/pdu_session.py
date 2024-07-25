@@ -15,3 +15,4 @@ class PDUSession:
         self.start_time = start_time
         self.duration = duration
         self.end_time = start_time + duration
+        self.migrated = False

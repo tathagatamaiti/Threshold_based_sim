@@ -14,8 +14,6 @@ if __name__ == "__main__":
     parser.add_argument("--arrival_rate", type=float, help="Inter-arrival rate in seconds (λ)")
     parser.add_argument("--mu", type=float, help="parameter for session duration in seconds (µ)")
     parser.add_argument("--migration_case", type=int, help="Case for session migration")
-    parser.add_argument("--throughput_rate", type=float, help="Rate for PDU session throughput (β)")
-    parser.add_argument("--upf_throughput_capacity", type=float, help="Throughput capacity of each UPF instance")
     parser.add_argument("--output-file", type=str, help="File to write simulation outputs")
     parser.add_argument("--seed", type=int, help="Seed for random number generation")
 
@@ -23,7 +21,7 @@ if __name__ == "__main__":
 
     scheduler = Scheduler(args.run_id, args.upf_case, args.max_upf_instances, args.min_upf_instances,
                           args.max_sessions_per_upf, args.scale_out_threshold, args.scale_in_threshold,
-                          args.simulation_time, args.arrival_rate, args.mu, args.migration_case, args.throughput_rate,
-                          args.upf_throughput_capacity, args.output_file,
+                          args.simulation_time, args.arrival_rate, args.mu, args.migration_case, args.output_file,
                           args.seed)
     scheduler.run()
+    

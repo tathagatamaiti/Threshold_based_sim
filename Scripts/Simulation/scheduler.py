@@ -17,8 +17,8 @@ class Scheduler:
     """
 
     def __init__(self, run_id, upf_case, max_upf_instances, min_upf_instances, max_sessions_per_upf,
-                 scale_out_threshold, scale_in_threshold, simulation_time, arrival_rate, mu, migration_case,
-                 throughput_rate, upf_throughput_capacity, output_file, seed=None):
+                 scale_out_threshold,
+                 scale_in_threshold, simulation_time, arrival_rate, mu, migration_case, output_file, seed=None):
         """
         Initialize the scheduler with simulation parameters.
 
@@ -34,8 +34,6 @@ class Scheduler:
         :param arrival_rate: Rate of session arrival (λ).
         :param mu: Session duration parameter (µ).
         :param migration_case: Case for session migration.
-        :param throughput_rate: PDU throughput rate.
-        :param upf_throughput_capacity: UPF throughput capacity
         :param output_file: File to write simulation outputs.
         """
         self.event_queue = []
@@ -51,8 +49,6 @@ class Scheduler:
         self.arrival_rate = arrival_rate
         self.mu = mu
         self.migration_case = migration_case
-        self.throughput_rate = throughput_rate
-        self.upf_throughput_capacity = upf_throughput_capacity
         self.num_upf_instances = 0
         self.next_upf_id = 0
         self.session_counter = 0
@@ -162,12 +158,11 @@ class Scheduler:
         session_id = self.session_counter
         self.session_counter += 1
         duration = (np.random.exponential(1 / self.mu) * 1000)
-        throughput = np.random.exponential(1 / self.throughput_rate)
-        session = PDUSession(session_id, np.ceil(self.current_time), duration, throughput)
+        session = PDUSession(session_id, np.ceil(self.current_time), duration)
 
         # Find an available UPF
         if self.upf_case == 1:
-            available_upf = next((upf for upf in self.upfs if upf.has_capacity_for(session.throughput)), None)
+            available_upf = next((upf for upf in self.upfs if len(upf.sessions) < self.max_sessions_per_upf), None)
         elif self.upf_case == 2:
             available_upf = self.get_upf_with_lowest_sessions() if self.upfs else None
         elif self.upf_case == 3:
@@ -177,7 +172,7 @@ class Scheduler:
             self._log(message)
 
         # If no available UPF, scale out if possible
-        if not available_upf or not available_upf.has_capacity_for(session.throughput):
+        if not available_upf:
             if self.num_upf_instances < self.max_upf_instances:
                 self.scale_out()
                 available_upf = self.upfs[-1]
@@ -190,7 +185,7 @@ class Scheduler:
                 self._log(message)
                 return
 
-        if available_upf and available_upf.has_capacity_for(session.throughput):
+        if available_upf:
             if (self.active_sessions == (self.num_upf_instances * self.max_sessions_per_upf) -
                     self.scale_out_threshold - 1) and self.num_upf_instances < self.max_upf_instances:
                 self.scale_out()
@@ -213,23 +208,14 @@ class Scheduler:
                        f"started on UPF {available_upf.upf_id}")
             self._log(message)
 
-            file_path_duration = f'../Data/session_durations_{self.run_id}.csv'
-            file_exists = os.path.isfile(file_path_duration)
-            file_empty = os.path.getsize(file_path_duration) == 0 if file_exists else True
-            with open(file_path_duration, 'a', newline='') as duration_file:
+            file_path = f'../Data/session_durations_{self.run_id}.csv'
+            file_exists = os.path.isfile(file_path)
+            file_empty = os.path.getsize(file_path) == 0 if file_exists else True
+            with open(file_path, 'a', newline='') as duration_file:
                 duration_writer = csv.writer(duration_file)
                 if file_empty:
                     duration_writer.writerow(['Session ID', 'Duration (seconds)'])
                 duration_writer.writerow([session_id, np.ceil(duration / 1000)])
-
-            file_path_throughput = f'../Data/session_throughput_{self.run_id}.csv'
-            file_exists = os.path.isfile(file_path_throughput)
-            file_empty = os.path.getsize(file_path_throughput) == 0 if file_exists else True
-            with open(file_path_throughput, 'a', newline='') as throughput_file:
-                throughput_writer = csv.writer(throughput_file)
-                if file_empty:
-                    throughput_writer.writerow(['Session ID', 'Throughput'])
-                throughput_writer.writerow([session_id, throughput])
 
     def terminate_pdu_session(self, session):
         upf = next((upf for upf in self.upfs if session in upf.sessions), None)
@@ -341,7 +327,7 @@ class Scheduler:
         """
         new_upf_id = self.next_upf_id
         self.next_upf_id += 1
-        new_upf = UPF(new_upf_id, self.upf_throughput_capacity)
+        new_upf = UPF(new_upf_id)
         self.upfs.append(new_upf)
         self.num_upf_instances += 1
         self.update_free_slots()
@@ -489,4 +475,13 @@ class Scheduler:
 
         self._log(f"Simulation completed. Total PDU sessions processed: {self.session_counter}. "
                   f"Total UPFs deployed: {self.next_upf_id}."
-                  f"Rejected sessions: {len(self.rejected_sessions)}.")
+                  f"Rejected sessions: {len(self.rejected_sessions)}."
+                  f"Accepted sessions: {self.session_counter - len(self.rejected_sessions)}.")
+
+        sim_data = open(f'../Data/sim_data_{self.run_id}.csv', 'w', newline='')
+        sim_data_writer = csv.writer(sim_data)
+        sim_data_writer.writerow(
+                ['Total PDU sessions processed', 'Rejected sessions', 'Accepted sessions'])
+        sim_data_writer.writerow([self.session_counter, len(self.rejected_sessions),
+                                  self.session_counter - len(self.rejected_sessions)])
+

@@ -5,13 +5,13 @@ cd ../Data
 echo "Available CSV files:"
 ls
 
-echo "Enter the names of 11 CSV files to process (separated by space):"
+echo "Enter the names of 12 CSV files to process (separated by space):"
 # shellcheck disable=SC2162
 read -a INPUT_FILES
 
 # Check if exactly 8 files are entered
-if [ ${#INPUT_FILES[@]} -ne 11 ]; then
-    echo "You must enter exactly 11 files."
+if [ ${#INPUT_FILES[@]} -ne 12 ]; then
+    echo "You must enter exactly 12 files."
     exit 1
 fi
 
